@@ -30,6 +30,13 @@ namespace Camisa10.UI
             var rig = root.gameObject.AddComponent<PersonRig>();
             rig.idleSeed = (float)Rng.RangeF(0, 10);
 
+            var human = HumanModel.Get();
+            if (human != null)
+            {
+                rig.BuildHuman(human, shirt, shorts, socks, boots, number, keeper);
+                return rig;
+            }
+
             var skin = Arena.Mat(Skins[Rng.RangeInt(0, Skins.Length - 1)]);
             var hair = Arena.Mat(Hairs[Rng.RangeInt(0, Hairs.Length - 1)]);
             var shirtM = Arena.Mat(shirt);
@@ -83,6 +90,163 @@ namespace Camisa10.UI
             return rig;
         }
 
+        // ---------- corpo com captura de movimento ----------
+        HumanModel model;
+        Transform[] bones;
+        Transform modelRoot;
+        Quaternion[] poseA, poseB;
+        string clip = "idle", prevClip;
+        float clipTime, prevTime, blend = 1;
+        float wArms, wCrouch, wLean, wReady;
+        int bSpine, bSpine1, bLArm, bLFore, bLHand, bRArm, bRFore, bRHand, bLUp, bLLeg, bLFoot, bRUp, bRLeg, bRFoot;
+
+        void BuildHuman(HumanModel h, Color shirt, Color shorts, Color socks, Color boots, int number, bool keeper)
+        {
+            model = h;
+            modelRoot = new GameObject("Corpo").transform;
+            modelRoot.SetParent(transform, false);
+            int n = h.Names.Length;
+            bones = new Transform[n];
+            for (int i = 0; i < n; i++)
+            {
+                var t = new GameObject(h.Names[i]).transform;
+                t.SetParent(h.Parent[i] >= 0 ? bones[h.Parent[i]] : modelRoot, false);
+                t.localPosition = h.RestPos[i]; t.localRotation = h.RestRot[i]; t.localScale = h.RestScale[i];
+                bones[i] = t;
+            }
+            poseA = new Quaternion[n]; poseB = new Quaternion[n];
+
+            Color skinC = Skins[Rng.RangeInt(0, Skins.Length - 1)];
+            var skin = Arena.Mat(skinC, .3f);
+            var mats = new Material[h.Mesh.subMeshCount];
+            Material M(HumanModel.Part p, Material m) { if ((int)p < mats.Length) mats[(int)p] = m; return m; }
+            M(HumanModel.Part.Shirt, Arena.Mat(shirt, .22f));
+            M(HumanModel.Part.Skin, skin);
+            M(HumanModel.Part.Shorts, Arena.Mat(shorts, .22f));
+            M(HumanModel.Part.Socks, Arena.Mat(socks, .1f));
+            M(HumanModel.Part.Boots, Arena.Mat(boots, .55f));
+            M(HumanModel.Part.Hands, keeper ? Arena.Mat(Theme.Hex("#F5F5F5"), .2f) : skin);
+            M(HumanModel.Part.Hair, Arena.Mat(Hairs[Rng.RangeInt(0, Hairs.Length - 1)], .35f));
+
+            var smrGo = new GameObject("Malha");
+            smrGo.transform.SetParent(modelRoot, false);
+            var smr = smrGo.AddComponent<SkinnedMeshRenderer>();
+            smr.sharedMesh = h.Mesh;
+            smr.bones = bones;
+            smr.rootBone = bones[h.Hips];
+            smr.sharedMaterials = mats;
+            smr.updateWhenOffscreen = true;
+            smr.quality = SkinQuality.Bone4;
+
+            // número nas costas, preso ao peito
+            int chest = h.Bone("Spine2");
+            if (chest >= 0)
+            {
+                var back = Arena.Prim(PrimitiveType.Quad, modelRoot, h.BackNumber, new Vector3(.22f, .22f, 1f), NumberMat(number, shirt));
+                back.name = "Numero";
+                back.transform.SetParent(bones[chest], true);
+            }
+
+            bSpine = h.Bone("Spine"); bSpine1 = h.Bone("Spine1");
+            bLArm = h.Bone("LeftArm"); bLFore = h.Bone("LeftForeArm"); bLHand = h.Bone("LeftHand");
+            bRArm = h.Bone("RightArm"); bRFore = h.Bone("RightForeArm"); bRHand = h.Bone("RightHand");
+            bLUp = h.Bone("LeftUpLeg"); bLLeg = h.Bone("LeftLeg"); bLFoot = h.Bone("LeftFoot");
+            bRUp = h.Bone("RightUpLeg"); bRLeg = h.Bone("RightLeg"); bRFoot = h.Bone("RightFoot");
+            clipTime = idleSeed;
+        }
+
+        /// <summary>Gira o osso (no mundo) para que o segmento até o filho aponte para dir.</summary>
+        void Aim(int bone, int child, Vector3 dir, float w)
+        {
+            if (w <= .001f || bone < 0 || child < 0) return;
+            var b = bones[bone];
+            var cur = bones[child].position - b.position;
+            if (cur.sqrMagnitude < 1e-6f) return;
+            var rot = Quaternion.FromToRotation(cur, dir);
+            b.rotation = Quaternion.Slerp(Quaternion.identity, rot, w) * b.rotation;
+        }
+
+        void UpdateHuman(float dt)
+        {
+            if (mode != lastMode) { modeTime = 0; lastMode = mode; }
+            modeTime += dt;
+            float k = 1f - Mathf.Exp(-10f * dt);
+
+            string want = mode == Mode.Run ? "run" : "idle";
+            if (want != clip && model.Clips.ContainsKey(want))
+            {
+                prevClip = clip; prevTime = clipTime;
+                clip = want; clipTime = want == "run" ? UnityEngine.Random.value : 0; blend = 0;
+            }
+            float rate = clip == "run" ? Mathf.Clamp(speed / 3.6f, .75f, 1.7f) : 1f;
+            clipTime += dt * rate;
+            prevTime += dt;
+            blend = Mathf.Min(1, blend + dt / .2f);
+
+            if (!model.Clips.TryGetValue(clip, out var c)) return;
+            model.Sample(c, clipTime, poseA, out var hipsPos);
+            if (blend < 1 && prevClip != null && model.Clips.TryGetValue(prevClip, out var pc))
+            {
+                model.Sample(pc, prevTime, poseB, out var hipsB);
+                for (int i = 0; i < poseA.Length; i++) poseA[i] = Quaternion.Slerp(poseB[i], poseA[i], blend);
+                hipsPos = Vector3.Lerp(hipsB, hipsPos, blend);
+            }
+            for (int i = 0; i < bones.Length; i++) bones[i].localRotation = poseA[i];
+
+            // camadas por cima da captura: agachar, braços para cima, inclinar
+            bool arms = mode == Mode.Jump || mode == Mode.Dive || mode == Mode.Celebrate;
+            wArms = Mathf.Lerp(wArms, arms ? 1 : 0, k);
+            wCrouch = Mathf.Lerp(wCrouch, mode == Mode.Ready ? 1 : mode == Mode.Stumble ? .7f : 0, k);
+            wReady = Mathf.Lerp(wReady, mode == Mode.Ready ? 1 : 0, k);
+            wLean = Mathf.Lerp(wLean, mode == Mode.Stumble ? 1 : 0, k);
+
+            var hipsT = bones[model.Hips];
+            var hp = hipsPos;
+            if (hipsT.parent != null) hp += hipsT.parent.InverseTransformVector(Vector3.down * .16f * wCrouch);
+            hipsT.localPosition = hp;
+
+            Vector3 up = transform.up, fwd = transform.forward, right = transform.right;
+            if (wCrouch > .001f)
+            {
+                Aim(bLUp, bLLeg, (fwd * .75f - up).normalized, wCrouch);
+                Aim(bRUp, bRLeg, (fwd * .75f - up).normalized, wCrouch);
+                Aim(bLLeg, bLFoot, (-fwd * .3f - up).normalized, wCrouch);
+                Aim(bRLeg, bRFoot, (-fwd * .3f - up).normalized, wCrouch);
+                if (bSpine >= 0) bones[bSpine].rotation = Quaternion.AngleAxis(22f * wCrouch, right) * bones[bSpine].rotation;
+            }
+            if (wLean > .001f && bSpine1 >= 0)
+                bones[bSpine1].rotation = Quaternion.AngleAxis(40f * wLean, right) * bones[bSpine1].rotation;
+            foreach (var (arm, fore, hand) in new[] { (bLArm, bLFore, bLHand), (bRArm, bRFore, bRHand) })
+            {
+                if (arm < 0) continue;
+                float side = Mathf.Sign(Vector3.Dot(bones[arm].position - transform.position, right));
+                if (wReady > .001f)
+                {
+                    Aim(arm, fore, (right * side * .7f - up * .5f + fwd * .45f).normalized, wReady);
+                    Aim(fore, hand, (fwd * .8f + right * side * .3f).normalized, wReady);
+                }
+                if (wArms > .001f)
+                {
+                    var dir = (up + right * side * (mode == Mode.Celebrate ? .5f : .2f)).normalized;
+                    Aim(arm, fore, dir, wArms);
+                    Aim(fore, hand, dir, wArms);
+                }
+            }
+
+            // saltos (barreira, comemoração)
+            float lift = 0;
+            if (mode == Mode.Jump)
+            {
+                float j = Mathf.Clamp01(modeTime / .45f);
+                lift = Mathf.Sin(j * Mathf.PI) * .38f;
+                if (j >= 1f) mode = Mode.Idle;
+            }
+            else if (mode == Mode.Celebrate) lift = Mathf.Abs(Mathf.Sin(modeTime * 10f)) * .12f;
+            var mp = modelRoot.localPosition;
+            mp.y = Mathf.Lerp(mp.y, lift, mode == Mode.Jump ? 1 : k);
+            modelRoot.localPosition = mp;
+        }
+
         // ---------- número da camisa (fonte bitmap 3x5) ----------
         static readonly string[] Digits =
         {
@@ -133,6 +297,7 @@ namespace Camisa10.UI
 
         void Update()
         {
+            if (model != null) { UpdateHuman(Time.deltaTime); return; }
             if (hips == null) return;
             float dt = Time.deltaTime;
             if (mode != lastMode) { modeTime = 0; lastMode = mode; }

@@ -37,7 +37,8 @@ Não é gerenciador estilo Brasfoot: você controla um jogador, não um time.
 3. Builds: menu **Camisa 10 > Configurar build Android** (paisagem, IL2CPP, ARM64).
 
 ## Prioridades atuais (feedback do dono)
-- Visual mais bonito e com sentido: o atual usa formas básicas. Próximo passo natural é trocar o `PersonRig`
-  por personagens humanoides animados (ex.: Mixamo ou Asset Store) mantendo a mesma interface pública.
+- Visual realista (o dono rejeita arte desenhada por código). Jogadores: `PersonRig` usa o corpo com captura de movimento
+  de `HumanModel` (Resources/Modelos/jogador.bytes, gerado por `Tools/Modelos/converter.py`); próximo passo é um
+  jogador da Mixamo com chute e defesa de goleiro. Escudos oficiais em Resources/Escudos; fontes Barlow em Resources/Fonts.
 - Telas fora de campo com cara de I Am Playr (apartamento, carros, roupas, vida social), menos tabelas.
 - Sensação do chute: ajustar força, curva e goleiro jogando no aparelho.
