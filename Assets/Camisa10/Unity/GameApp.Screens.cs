@@ -88,7 +88,7 @@ namespace Camisa10.UI
             nameRt.sizeDelta = new Vector2(330 * k, 70 * k);
             nameRt.anchoredPosition = new Vector2(0, 95 * k);
             shirtName = nameRt.gameObject.AddComponent<Text>();
-            shirtName.font = UIKit.Font; shirtName.fontSize = (int)(50 * k); shirtName.fontStyle = FontStyle.Bold;
+            UIKit.Style(shirtName, FontStyle.Bold); shirtName.fontSize = (int)(50 * k);
             shirtName.color = Color.white; shirtName.alignment = TextAnchor.MiddleCenter;
             shirtName.resizeTextForBestFit = true; shirtName.resizeTextMinSize = 14; shirtName.resizeTextMaxSize = (int)(50 * k);
             shirtName.raycastTarget = false;
@@ -596,7 +596,7 @@ namespace Camisa10.UI
             if (!string.IsNullOrEmpty(p.boot.brand))
             {
                 var bt = UIKit.Txt(boot.transform, p.boot.brand, 26, Theme.Hex(p.boot.c2), FontStyle.Bold, TextAnchor.MiddleCenter);
-                bt.fontStyle = FontStyle.BoldAndItalic;
+                UIKit.Style(bt, FontStyle.BoldAndItalic);
                 bt.rectTransform.anchorMin = new Vector2(.36f, .38f);
                 bt.rectTransform.anchorMax = new Vector2(.66f, .5f);
                 bt.rectTransform.offsetMin = Vector2.zero; bt.rectTransform.offsetMax = Vector2.zero;

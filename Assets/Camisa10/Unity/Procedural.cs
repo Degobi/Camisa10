@@ -40,12 +40,41 @@ namespace Camisa10.UI
         }
 
         /// <summary>
+        /// Painel com volume: degradê vertical, filete de luz na borda de cima e borda escura embaixo.
+        /// É branco/cinza para ser tingido pela cor da Image; fatiado (9-slice) para qualquer tamanho.
+        /// </summary>
+        public static Sprite PanelSprite(int size, int radius)
+        {
+            var tex = NewTex(size, size);
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float cx = Mathf.Clamp(x + .5f, radius, size - radius);
+                    float cy = Mathf.Clamp(y + .5f, radius, size - radius);
+                    float d = Vector2.Distance(new Vector2(x + .5f, y + .5f), new Vector2(cx, cy));
+                    float a = Mathf.Clamp01(radius - d + .5f);
+                    float v = (y + .5f) / size;                 // 0 = base, 1 = topo
+                    float k = Mathf.Lerp(.78f, .97f, v);        // degradê
+                    float rim = Mathf.Clamp01(1.8f - (radius - d)); // ~2px junto da borda
+                    if (v > .5f) k = Mathf.Lerp(k, 1f, rim * Mathf.InverseLerp(.5f, 1f, v));   // luz em cima
+                    else k = Mathf.Lerp(k, .6f, rim * Mathf.InverseLerp(.5f, 0f, v));          // sombra embaixo
+                    byte c = (byte)(k * 255);
+                    px[y * size + x] = new Color32(c, c, c, (byte)(a * 255));
+                }
+            tex.SetPixels32(px);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(.5f, .5f), 100, 0, SpriteMeshType.FullRect,
+                new Vector4(radius, radius, radius, radius));
+        }
+
+        /// <summary>
         /// Fundo dos menus: degradê azul-noite com faixas diagonais de luz, no clima das telas de modo carreira.
         /// </summary>
         public static Sprite BackdropSprite()
         {
             if (cache.TryGetValue("backdrop", out var s)) return s;
-            int w = 480, h = 270;
+            int w = 960, h = 540;
             var tex = NewTex(w, h);
             var px = new Color32[w * h];
             Color top = Theme.BgTop, bottom = Theme.Bg, glow = Theme.Turf, glow2 = Theme.Cyan;

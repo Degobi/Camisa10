@@ -12,18 +12,36 @@ namespace Camisa10.UI
     /// </summary>
     public static class UIKit
     {
-        static Font font;
-        public static Font Font
+        static Font font, bold, boldItalic;
+
+        // Fontes Barlow (licença OFL, em Resources/Fonts): texto corrido em Barlow, títulos e números em Barlow Condensed,
+        // no estilo das telas de jogos de futebol. Sem os arquivos, cai na fonte padrão da Unity.
+        static Font Load(string name) => Resources.Load<Font>("Fonts/" + name) ?? Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        public static Font Font => font != null ? font : (font = Load("Barlow-Medium"));
+        public static Font Bold => bold != null ? bold : (bold = Load("BarlowCondensed-Bold"));
+        public static Font BoldItalic => boldItalic != null ? boldItalic : (boldItalic = Load("BarlowCondensed-BoldItalic"));
+
+        /// <summary>Aplica a fonte certa para o estilo (negrito usa o arquivo condensado em vez de negrito sintético).</summary>
+        public static void Style(Text t, FontStyle style)
         {
-            get
+            switch (style)
             {
-                if (font == null) font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-                return font;
+                case FontStyle.Bold: t.font = Bold; t.fontStyle = Bold.name.Contains("Barlow") ? FontStyle.Normal : FontStyle.Bold; break;
+                case FontStyle.BoldAndItalic: t.font = BoldItalic; t.fontStyle = BoldItalic.name.Contains("Barlow") ? FontStyle.Normal : FontStyle.BoldAndItalic; break;
+                default: t.font = Font; t.fontStyle = style; break;
             }
         }
 
+        /// <summary>Sombra suave embaixo de painéis e botões, para dar profundidade.</summary>
+        public static void Depth(Graphic g, float dist = 6, float alpha = .45f)
+        {
+            var sh = g.gameObject.AddComponent<Shadow>();
+            sh.effectColor = new Color(0, 0, 0, alpha);
+            sh.effectDistance = new Vector2(0, -dist);
+        }
+
         static Sprite round, circle;
-        public static Sprite Round => round != null ? round : (round = Procedural.RoundedSprite(64, 10));
+        public static Sprite Round => round != null ? round : (round = Procedural.PanelSprite(96, 14));
         public static Sprite Circle => circle != null ? circle : (circle = Procedural.RoundedSprite(64, 32));
 
         public static RectTransform Rect(string name, Transform parent)
@@ -69,11 +87,10 @@ namespace Camisa10.UI
         {
             var rt = Rect("Text", parent);
             var t = rt.gameObject.AddComponent<Text>();
-            t.font = Font;
+            Style(t, style);
             t.text = text;
             t.fontSize = size;
             t.color = color;
-            t.fontStyle = style;
             t.alignment = align;
             t.horizontalOverflow = HorizontalWrapMode.Wrap;
             t.verticalOverflow = VerticalWrapMode.Overflow;
@@ -120,6 +137,7 @@ namespace Camisa10.UI
         public static Button Btn(Transform parent, string label, Color bg, Color fg, Action onClick, int height = 92, int size = 32)
         {
             var im = Img(parent, bg, true, "Button");
+            Depth(im, 5, .5f);
             var b = im.gameObject.AddComponent<Button>();
             b.targetGraphic = im;
             var cb = b.colors;
@@ -156,7 +174,8 @@ namespace Camisa10.UI
         /// </summary>
         public static RectTransform Tile(Transform parent, string label, Color? accent = null, float flex = 1, int pad = 28, int spacing = 14)
         {
-            var im = Img(parent, Theme.Alpha(Theme.Card, .92f), true, "Tile");
+            var im = Img(parent, Theme.Alpha(Theme.CardHi, .94f), true, "Tile");
+            Depth(im, 8, .5f);
             var v = V(im.gameObject, pad, spacing);
             v.padding = new RectOffset(pad, pad, pad + 6, pad);
             LE(im, flexW: flex, prefW: 0, minW: 0);

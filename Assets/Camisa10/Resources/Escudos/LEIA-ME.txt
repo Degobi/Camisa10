@@ -1,6 +1,7 @@
-ESCUDOS OFICIAIS (opcional)
+ESCUDOS OFICIAIS
 
-Coloque aqui as imagens dos escudos em PNG, de preferência com fundo transparente e
+Já incluídos: 26 clubes. Faltam Cruzeiro, Bahia, Vasco da Gama e Grêmio (o jogo desenha um escudo
+no lugar). Para trocar ou completar, coloque aqui as imagens dos escudos em PNG, de preferência com fundo transparente e
 mais ou menos 256 pixels de altura. O jogo usa a imagem no lugar do escudo desenhado.
 
 O nome do arquivo precisa ser exatamente um destes:
