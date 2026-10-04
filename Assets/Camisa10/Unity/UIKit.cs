@@ -1,4 +1,5 @@
 using System;
+using Camisa10.Core;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -240,12 +241,26 @@ namespace Camisa10.UI
             if (v01 <= 0.02f) f.enabled = false;
         }
 
-        public static Image Crest(Transform parent, string c1, string c2, float w = 54, float h = 64)
+        public static Image Crest(Transform parent, Club club, float w = 54, float h = 64)
         {
             var im = Img(parent, Color.white, false, "Crest");
-            im.sprite = Procedural.CrestSprite(c1, c2);
+            im.sprite = Procedural.CrestSprite(club);
             im.preserveAspect = true;
             LE(im, h, h, prefW: w, minW: w);
+            // iniciais do clube por cima do escudo desenhado (só onde o escudo é grande o bastante para ler)
+            var d = Art.CrestArt.For(club.name, club.c1, club.c2);
+            if (h >= 44 && !string.IsNullOrEmpty(d.Text) && !Procedural.HasOfficialCrest(club))
+            {
+                var t = Txt(im.transform, d.Text, Mathf.RoundToInt(h * d.TextSize), Theme.Hex(d.TextCol), FontStyle.Bold, TextAnchor.MiddleCenter);
+                var rt = t.rectTransform;
+                rt.anchorMin = new Vector2(.12f, 1 - d.TextY - d.TextSize * .7f);
+                rt.anchorMax = new Vector2(.88f, 1 - d.TextY + d.TextSize * .7f);
+                rt.offsetMin = rt.offsetMax = Vector2.zero;
+                t.resizeTextForBestFit = true; t.resizeTextMinSize = 6; t.resizeTextMaxSize = Mathf.RoundToInt(h * d.TextSize);
+                t.raycastTarget = false;
+                var sh = t.gameObject.AddComponent<Shadow>();
+                sh.effectColor = new Color(0, 0, 0, .45f); sh.effectDistance = new Vector2(1, -1);
+            }
             return im;
         }
 

@@ -238,7 +238,7 @@ namespace Camisa10.UI
             UIKit.Clear(header);
             var p = game.S.player; var c = game.MyClub; var se = game.S.season;
 
-            UIKit.Crest(header, c.c1, c.c2, 62, 74);
+            UIKit.Crest(header, c, 62, 74);
             var col = UIKit.Column(header, 0);
             UIKit.LE(col, flexW: 1, minW: 0, prefW: 0);
             var tag = UIKit.Label(col, $"Modo carreira · {c.name}", Theme.Turf, 22);

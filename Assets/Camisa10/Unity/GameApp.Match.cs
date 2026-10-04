@@ -147,6 +147,7 @@ namespace Camisa10.UI
             topFill.gameObject.SetActive(false);
             chanceHud = ChanceHud.Build(canvasRoot);
             chance = Chance3D.Play(transform, game, match, chanceHud, OnChanceDone);
+            Debug.Log("[Camisa 10] Lance 3D iniciado (versão com campo visível).");
         }
 
         void OnChanceDone(LiveOutcome outcome)

@@ -231,7 +231,7 @@ namespace Camisa10.UI
             a.Cam.backgroundColor = new Color(.55f, .72f, .9f);
             a.Cam.nearClipPlane = .05f;
             a.Cam.farClipPlane = 500;
-            a.Cam.depth = 10;
+            a.Cam.depth = 50; // sempre por cima da câmera da interface
             a.FitCamera();
 
             // gramado (com colisor, a bola quica nele)

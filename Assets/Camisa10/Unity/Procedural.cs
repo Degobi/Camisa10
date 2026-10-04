@@ -8,7 +8,7 @@ namespace Camisa10.UI
     /// Gera as imagens do jogo em tempo de execução (cantos arredondados, escudos,
     /// listras da figurinha e a chuteira personalizável). Assim o projeto não precisa de assets.
     /// </summary>
-    public static class Procedural
+    public static partial class Procedural
     {
         static readonly Dictionary<string, Sprite> cache = new Dictionary<string, Sprite>();
 
@@ -84,32 +84,6 @@ namespace Camisa10.UI
                 {
                     float t = vertical ? y / (float)(h - 1) : 1 - x / (float)(w - 1);
                     px[y * w + x] = new Color32(255, 255, 255, (byte)(Mathf.SmoothStep(0, 1, t) * 255));
-                }
-            tex.SetPixels32(px);
-            tex.Apply();
-            s = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(.5f, .5f), 100);
-            cache[key] = s;
-            return s;
-        }
-
-        /// <summary>Escudo simples dividido na diagonal com as cores do clube.</summary>
-        public static Sprite CrestSprite(string c1, string c2)
-        {
-            string key = "crest" + c1 + c2;
-            if (cache.TryGetValue(key, out var s)) return s;
-            int w = 48, h = 58;
-            var tex = NewTex(w, h);
-            var px = new Color32[w * h];
-            Color32 a = Theme.Hex(c1), b = Theme.Hex(c2), edge = new Color32(0, 0, 0, 90), clear = new Color32(0, 0, 0, 0);
-            for (int y = 0; y < h; y++)
-                for (int x = 0; x < w; x++)
-                {
-                    // formato de escudo: retângulo em cima, ponta arredondada embaixo
-                    float nx = (x + .5f) / w - .5f, ny = (y + .5f) / h;
-                    bool inside = ny > .35f ? Mathf.Abs(nx) < .5f : (nx * nx) / .25f + ((.35f - ny) * (.35f - ny)) / (.35f * .35f) < 1f;
-                    if (!inside) { px[y * w + x] = clear; continue; }
-                    bool border = x < 2 || x >= w - 2 || y >= h - 2;
-                    px[y * w + x] = border ? edge : (x + (h - y) * w / (float)h < w ? a : b);
                 }
             tex.SetPixels32(px);
             tex.Apply();
@@ -209,40 +183,6 @@ namespace Camisa10.UI
             var s = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(.5f, .5f), 100);
             cache["shirt"] = s;
             return s;
-        }
-
-        static Texture2D bootTex;
-
-        public static Sprite BootSprite(BootStyle b)
-        {
-            const float scale = 2f;
-            int w = 500, h = 240;
-            if (bootTex != null) Object.Destroy(bootTex);
-            bootTex = NewTex(w, h);
-            var buf = new Color32[w * h];
-            Color32 c1 = Theme.Hex(b.c1), c2 = Theme.Hex(b.c2), sole = Theme.Hex(b.sole), dark = new Color32(30, 30, 30, 255);
-
-            var upper = new Path(22, 72).C(20, 50, 38, 38, 68, 35).L(118, 29).C(134, 27, 150, 19, 166, 21).L(176, 23)
-                .C(183, 40, 196, 52, 216, 58).C(230, 62, 235, 73, 230, 83).L(28, 85).C(22, 85, 22, 79, 22, 72);
-            var soleP = new Path(24, 84).L(230, 82).C(232, 89, 228, 93, 222, 93).L(34, 94).C(27, 94, 23, 90, 24, 84);
-            var stripe = new Path(68, 72).C(110, 63, 152, 52, 206, 62).L(203, 71).C(152, 62, 112, 73, 72, 80);
-
-            // contorno: mesma forma um pouco deslocada em tom escuro
-            var outline = new List<Vector2>();
-            foreach (var p in upper.Pts) outline.Add(new Vector2(p.x, p.y + 1.5f));
-            Fill(buf, w, h, scale, outline, dark);
-            foreach (float sx in new[] { 40f, 66f, 150f, 176f, 203f }) Fill(buf, w, h, scale, RectPath(sx, 92, 9, 9).Pts, sole);
-            Fill(buf, w, h, scale, soleP.Pts, sole);
-            Fill(buf, w, h, scale, upper.Pts, c1);
-            Fill(buf, w, h, scale, stripe.Pts, c2);
-            Fill(buf, w, h, scale, Line(124, 34, 134, 44, 3).Pts, c2);
-            Fill(buf, w, h, scale, Line(134, 31, 144, 41, 3).Pts, c2);
-            Fill(buf, w, h, scale, Line(144, 27, 154, 37, 3).Pts, c2);
-            Fill(buf, w, h, scale, Line(154, 24, 164, 34, 3).Pts, c2);
-
-            bootTex.SetPixels32(buf);
-            bootTex.Apply();
-            return Sprite.Create(bootTex, new Rect(0, 0, w, h), new Vector2(.5f, .5f), 100);
         }
     }
 }

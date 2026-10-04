@@ -1,0 +1,40 @@
+ESCUDOS OFICIAIS (opcional)
+
+Coloque aqui as imagens dos escudos em PNG, de preferência com fundo transparente e
+mais ou menos 256 pixels de altura. O jogo usa a imagem no lugar do escudo desenhado.
+
+O nome do arquivo precisa ser exatamente um destes:
+
+  flamengo.png   (Flamengo)
+  palmeiras.png   (Palmeiras)
+  botafogo.png   (Botafogo)
+  cruzeiro.png   (Cruzeiro)
+  fluminense.png   (Fluminense)
+  sao-paulo.png   (São Paulo)
+  corinthians.png   (Corinthians)
+  bahia.png   (Bahia)
+  vasco-da-gama.png   (Vasco da Gama)
+  gremio.png   (Grêmio)
+  real-madrid.png   (Real Madrid)
+  barcelona.png   (Barcelona)
+  atletico-de-madrid.png   (Atlético de Madrid)
+  athletic-bilbao.png   (Athletic Bilbao)
+  villarreal.png   (Villarreal)
+  real-betis.png   (Real Betis)
+  real-sociedad.png   (Real Sociedad)
+  sevilla.png   (Sevilla)
+  valencia.png   (Valencia)
+  celta-de-vigo.png   (Celta de Vigo)
+  liverpool.png   (Liverpool)
+  manchester-city.png   (Manchester City)
+  arsenal.png   (Arsenal)
+  chelsea.png   (Chelsea)
+  manchester-united.png   (Manchester United)
+  newcastle.png   (Newcastle)
+  tottenham.png   (Tottenham)
+  aston-villa.png   (Aston Villa)
+  brighton.png   (Brighton)
+  west-ham.png   (West Ham)
+
+Atenção: escudos são marcas registradas dos clubes. Para testar no seu aparelho tudo bem;
+para publicar na loja é preciso licença (o mesmo vale para os nomes reais).

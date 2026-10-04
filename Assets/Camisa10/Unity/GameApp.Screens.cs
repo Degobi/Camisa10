@@ -53,7 +53,7 @@ namespace Camisa10.UI
         {
             var col = UIKit.Column(parent, 8, TextAnchor.UpperCenter);
             UIKit.LE(col, flexW: 1, minW: 0, prefW: 0);
-            UIKit.Crest(col, c.c1, c.c2, crestH * .83f, crestH);
+            UIKit.Crest(col, c, crestH * .83f, crestH);
             UIKit.Txt(col, c.name, 28, textColor, FontStyle.Bold, TextAnchor.UpperCenter);
         }
 
@@ -294,7 +294,7 @@ namespace Camisa10.UI
             var style = me || head ? FontStyle.Bold : FontStyle.Normal;
             int size = head ? 20 : 25;
             UIKit.LE(UIKit.Txt(bg.transform, pos, size, col, style), prefW: 40);
-            if (club != null) UIKit.Crest(bg.transform, club.c1, club.c2, 26, 32);
+            if (club != null) UIKit.Crest(bg.transform, club, 26, 32);
             else UIKit.LE(UIKit.Rect("Gap", bg.transform), prefW: 26);
             UIKit.LE(UIKit.Txt(bg.transform, head ? name.ToUpperInvariant() : name, size, col, style), flexW: 1, minW: 0);
             UIKit.LE(UIKit.Txt(bg.transform, pts, size, col, FontStyle.Bold, TextAnchor.UpperRight), prefW: 56);
@@ -554,7 +554,7 @@ namespace Camisa10.UI
             var csf = pill.gameObject.AddComponent<ContentSizeFitter>();
             csf.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
             csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            UIKit.Crest(pill.transform, c.c1, c.c2, 26, 32);
+            UIKit.Crest(pill.transform, c, 26, 32);
             UIKit.Txt(pill.transform, c.name, 24, Theme.Ink, FontStyle.Bold);
 
             UIKit.Txt(inner.transform, p.name.ToUpperInvariant(), 48, Theme.Ink, FontStyle.Bold);
@@ -596,8 +596,9 @@ namespace Camisa10.UI
             if (!string.IsNullOrEmpty(p.boot.brand))
             {
                 var bt = UIKit.Txt(boot.transform, p.boot.brand, 26, Theme.Hex(p.boot.c2), FontStyle.Bold, TextAnchor.MiddleCenter);
-                bt.rectTransform.anchorMin = new Vector2(.3f, .38f);
-                bt.rectTransform.anchorMax = new Vector2(.6f, .52f);
+                bt.fontStyle = FontStyle.BoldAndItalic;
+                bt.rectTransform.anchorMin = new Vector2(.36f, .38f);
+                bt.rectTransform.anchorMax = new Vector2(.66f, .5f);
                 bt.rectTransform.offsetMin = Vector2.zero; bt.rectTransform.offsetMax = Vector2.zero;
             }
             string[] pal = GameData.BootPalettes.TryGetValue(p.boot.brand ?? "", out var found) ? found : GameData.BootPalettes[""];
@@ -630,7 +631,7 @@ namespace Camisa10.UI
             Color col = head ? Theme.Muted : Theme.Ink;
             int size = head ? 20 : 24;
             UIKit.LE(UIKit.Txt(row, year, size, col), prefW: 70);
-            if (rec != null) UIKit.Crest(row, rec.c1, rec.c2, 24, 30);
+            if (rec != null) UIKit.Crest(row, new Club { name = rec.club, c1 = rec.c1, c2 = rec.c2 }, 24, 30);
             else UIKit.LE(UIKit.Rect("Gap", row), prefW: 24);
             UIKit.LE(UIKit.Txt(row, club, size, col), flexW: 1, minW: 0);
             foreach (var v in new[] { j, g, a }) UIKit.LE(UIKit.Txt(row, v, size, col, FontStyle.Normal, TextAnchor.UpperRight), prefW: 44);
@@ -665,7 +666,7 @@ namespace Camisa10.UI
 
             var cur = UIKit.Tile(cols, "Contrato atual", Theme.Turf, .85f);
             var hr = UIKit.Row(cur, 14);
-            UIKit.Crest(hr, c.c1, c.c2, 50, 60);
+            UIKit.Crest(hr, c, 50, 60);
             UIKit.LE(UIKit.Txt(hr, c.name, 34, Theme.Ink, FontStyle.Bold, TextAnchor.MiddleLeft), flexW: 1, minW: 0);
             UIKit.KV(cur, "Salário", Fmt.Money(k.salary) + " por semana");
             UIKit.KV(cur, "Bônus por gol", Fmt.Money(k.bonus));
@@ -731,7 +732,7 @@ namespace Camisa10.UI
             var sc = SubCard(parent);
             UIKit.LE(sc, flexW: 1, prefW: 0, minW: 0);
             var r = UIKit.Row(sc, 12);
-            UIKit.Crest(r, club.c1, club.c2, 40, 48);
+            UIKit.Crest(r, club, 40, 48);
             var name = UIKit.Txt(r, club.name, 30, Theme.Ink, FontStyle.Bold, TextAnchor.MiddleLeft);
             UIKit.LE(name, flexW: 1, minW: 0);
             UIKit.Tag(r, o.renewal ? "Renovação" : Game.League(club.league).Name, Theme.Card, Theme.Ink);
