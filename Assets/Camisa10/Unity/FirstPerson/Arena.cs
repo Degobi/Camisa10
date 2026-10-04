@@ -674,13 +674,16 @@ namespace Camisa10.UI
         }
 
         /// <summary>Ajusta o campo de visão e a área de desenho para a tela deitada.</summary>
+        /// <summary>Graus extras no campo de visão (arrancada).</summary>
+        public float FovBoost;
+
         public void FitCamera()
         {
             EnsureView();
             // paisagem: campo de visão horizontal amplo, como a câmera de um jogo de futebol
             Cam.rect = Landscape.Viewport01;
             float hFov = 80f * Mathf.Deg2Rad;
-            Cam.fieldOfView = Mathf.Clamp(2f * Mathf.Atan(Mathf.Tan(hFov / 2f) / Landscape.GameAspect) * Mathf.Rad2Deg, 50f, 60f);
+            Cam.fieldOfView = Mathf.Clamp(2f * Mathf.Atan(Mathf.Tan(hFov / 2f) / Landscape.GameAspect) * Mathf.Rad2Deg, 50f, 60f) + FovBoost;
         }
 
         public Transform Person(string name, Color shirt, Color shorts, Vector3 pos, float yaw, bool keeper = false)

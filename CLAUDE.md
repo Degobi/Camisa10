@@ -21,7 +21,11 @@ Não é gerenciador estilo Brasfoot: você controla um jogador, não um time.
 - 3D em `Assets/Camisa10/Unity/FirstPerson/`: `Arena` (estádio com dois anéis, cobertura, placas de LED, dia ou noite
   via `StadiumStyle`), `StadiumArt` (texturas do estádio), `MeshBuilder` (junta peças repetidas numa malha só: no celular
   cada objeto custa uma chamada de desenho), `PersonRig` (jogador), `Chance3D` (lance em primeira pessoa),
-  `SwipePad` (entrada), `ChanceHud` (HUD do lance, placar estilo TV e vinheta).
+  `SwipePad` e `TouchControls` (entrada), `ChanceHud` (HUD do lance, placar estilo TV e vinheta).
+  Movimento em campo com aceleração e bote (`Chance3D.Steer`), e o `PersonRig` escolhe parado/andando/correndo pela
+  velocidade medida: mova o Transform, não force a animação.
+- Som: `MatchAudio` é o som do lance (torcida, toque, chute, comemoração, lamento, apito); `Sfx` é o som global
+  (rede, trave e o que tocar fora do lance). Não chame os dois para o mesmo evento.
 - Paisagem é garantida por `Landscape.cs` + `SafeArea.cs` (faixa 16:9 em telas mais altas que 4:3), pelo `CanvasScaler`
   (referência 1920x1080) e pela câmera do lance (`Arena.FitCamera` + `Arena.PitchBias`). Respeite isso em qualquer tela nova.
 - Telas fora de campo: monte linhas com `UIKit.Cols` e blocos com `UIKit.Tile` (ou `UIKit.Stack` para empilhar).

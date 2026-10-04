@@ -54,6 +54,21 @@ namespace Camisa10.UI
         readonly List<Transform> pressers = new List<Transform>();
         readonly Dictionary<Transform, float> stunUntil = new Dictionary<Transform, float>();
 
+        // corpo e bola separados: a bola rola à frente e o jogador a toca de novo quando alcança
+        Vector3 me, ballVel, camVel, camLook;
+        bool camInit;
+        float lastTouch = -9, touchAt = -9, stepPhase, fovBoost;
+
+        /// <summary>Estado de movimento de quem corre em campo: velocidade com aceleração, reação atrasada e bote.</summary>
+        sealed class Mover
+        {
+            public Vector3 vel, seenBall, seenVel, lungeDir;
+            public float react, aggr, lungeUntil, nextLunge;
+            public bool lunging;
+        }
+        readonly Dictionary<Transform, Mover> movers = new Dictionary<Transform, Mover>();
+        MatchAudio sfx;
+
         // cabeceio
         Vector3 headPoint;
         bool crossLaunched;
@@ -213,10 +228,13 @@ namespace Camisa10.UI
             foreach (var bl in blockers) Rig(bl).Set(wallJump ? PersonRig.Mode.Idle : PersonRig.Mode.Ready);
             if (type != "defesa" && type != "cabeceio") CreateFoot();
 
+            foreach (var r in A.Root.GetComponentsInChildren<PersonRig>()) r.LookAt = A.Ball.transform;
+            me = Flat(A.Ball.transform.position) - Vector3.forward * .45f;
+            sfx = MatchAudio.Create(A.Root, A.Cam);
+
             // apresentação do lance antes de liberar o controle
             introUntil = Time.time + 1.4f;
-            Sfx.Crowd(true, A.Night ? .5f : .42f);
-            if (type == "falta") Sfx.Play(Sfx.Kind.Whistle, .5f);
+            if (type == "falta") sfx?.Whistle();
             hud.Intro($"{m.Minute}'  {m.Current.Text}");
             startTime = introUntil;
             prevBall = A.Ball.transform.position;
@@ -246,6 +264,44 @@ namespace Camisa10.UI
         static float R(float a, float b) => (float)Rng.RangeF(a, b);
         static PersonRig Rig(Transform t) => t != null ? t.GetComponent<PersonRig>() : null;
 
+        Mover Mv(Transform t)
+        {
+            if (!movers.TryGetValue(t, out var mv))
+            {
+                var b = Flat(A.Ball.transform.position);
+                mv = new Mover
+                {
+                    react = Mathf.Lerp(.34f, .17f, opp01) * R(.85f, 1.2f),
+                    aggr = R(.7f, 1.25f) * Mathf.Lerp(.85f, 1.15f, opp01),
+                    seenBall = b,
+                    nextLunge = Time.time + R(.5f, 1.1f),
+                };
+                movers[t] = mv;
+            }
+            return mv;
+        }
+
+        /// <summary>
+        /// Move com aceleração limitada (ninguém sai do zero ao máximo num quadro) e gira o corpo aos poucos.
+        /// </summary>
+        void Steer(Transform t, Vector3 desiredVel, float accel, float dt, Vector3? faceAt = null, float turnDeg = 480f)
+        {
+            var mv = Mv(t);
+            mv.vel = Vector3.MoveTowards(mv.vel, Flat(desiredVel), accel * dt);
+            t.position += mv.vel * dt;
+            var look = faceAt.HasValue ? Flat(faceAt.Value - t.position) : mv.vel;
+            if (look.sqrMagnitude > .04f) t.rotation = Quaternion.RotateTowards(t.rotation, Quaternion.LookRotation(look), turnDeg * dt);
+        }
+
+        /// <summary>Velocidade desejada para chegar a um ponto, freando perto dele.</summary>
+        static Vector3 Arrive(Vector3 from, Vector3 to, float maxSpeed, float slowRadius = 1.6f)
+        {
+            var d = Flat(to - from);
+            float dist = d.magnitude;
+            if (dist < .05f) return Vector3.zero;
+            return d / dist * Mathf.Min(maxSpeed, maxSpeed * dist / slowRadius);
+        }
+
         void CreateFoot()
         {
             var boot = P.boot;
@@ -262,6 +318,17 @@ namespace Camisa10.UI
         {
             if (foot == null) return;
             var b = A.Ball.transform.position;
+            float touch = Time.time - touchAt < .18f ? Mathf.Sin((Time.time - touchAt) / .18f * Mathf.PI) : 0;
+            if (carry && kickT < 0)
+            {
+                // o pé acompanha o corpo e encosta na bola a cada toque
+                var toBall = Flat(b - me);
+                var fwd = toBall.sqrMagnitude > .01f ? toBall.normalized : Vector3.forward;
+                var reach = Mathf.Lerp(.2f, Mathf.Min(toBall.magnitude - .12f, .8f), touch);
+                foot.position = me + fwd * reach + new Vector3(.18f, .58f + Mathf.Sin(stepPhase * Mathf.PI * 2f) * .02f, 0);
+                foot.rotation = Quaternion.LookRotation(fwd) * Quaternion.Euler(-40f * touch + 12f, 0, 0);
+                return;
+            }
             foot.position = new Vector3(b.x + .22f, .58f, b.z - .45f);
             float swing = kickT >= 0 ? Mathf.Sin(Mathf.Clamp01(kickT / .22f) * Mathf.PI) : 0;
             foot.rotation = Quaternion.Euler(-70f * swing + 12f, 0, 0);
@@ -279,12 +346,6 @@ namespace Camisa10.UI
         {
             SetBall(ball);
             A.PlaceCamera(ball + new Vector3(0, 1.6f, -2.4f), new Vector3(0, .9f, 0));
-        }
-
-        static void Face(Transform t, Vector3 target)
-        {
-            var d = Flat(target - t.position);
-            if (d.sqrMagnitude > .01f) t.rotation = Quaternion.LookRotation(d);
         }
 
         void Launch(Vector3 start, Vector3 target, float speed)
@@ -338,9 +399,9 @@ namespace Camisa10.UI
             carry = false;
             hud.HideControls();
             kickT = 0;
+            sfx?.Kick(.6f + power01 * .4f);
             foreach (var bl in blockers) if (wallJump) Rig(bl).Set(PersonRig.Mode.Jump);
             Launch(start, target, speed);
-            Sfx.Play(Sfx.Kind.Kick, .55f + power01 * .45f, (type == "cabeceio" ? 1.35f : 1.08f) - power01 * .16f);
             shotTime = Time.time;
             phase = Phase.Flight;
             hud.SetHint("");
@@ -360,8 +421,8 @@ namespace Camisa10.UI
             carry = false;
             hud.HideControls();
             kickT = 0;
+            sfx?.Kick(.45f);
             Launch(start, target, speed);
-            Sfx.Play(Sfx.Kind.Kick, .45f + power01 * .3f, 1.15f);
             shotTime = Time.time;
             phase = Phase.Flight;
             hud.SetHint("");
@@ -420,14 +481,23 @@ namespace Camisa10.UI
 
             if (mate != null && !mateHasBall)
             {
-                mate.position = Vector3.MoveTowards(mate.position, mateTarget, mateSpeed * dt);
-                Face(mate, mateTarget);
+                // o companheiro arranca, faz a curva da corrida e diminui ao chegar no espaço
+                Steer(mate, Arrive(mate.position, mateTarget, mateSpeed), 7f, dt, phase == Phase.Aim ? (Vector3?)null : A.Ball.transform.position);
             }
+            else if (mate != null) Steer(mate, Vector3.zero, 9f, dt, A.Ball.transform.position);
             if (marker != null && mate != null)
             {
-                marker.position = Vector3.MoveTowards(marker.position, mate.position + new Vector3(0, 0, 1.2f), 4.2f * dt);
-                Face(marker, mate.position);
+                // o marcador lê a corrida com atraso e acompanha de lado, entre o atacante e o gol
+                var mv = Mv(marker);
+                mv.seenBall = Vector3.Lerp(mv.seenBall, mate.position, 1f - Mathf.Exp(-dt / mv.react));
+                var spot = mv.seenBall + Flat(-mv.seenBall).normalized * 1.1f;
+                Steer(marker, Arrive(marker.position, spot, mateSpeed * .95f, 1.2f), 6.5f, dt, mate.position);
             }
+
+            // fora da condução, quem estava correndo freia com o embalo em vez de congelar
+            if (phase != Phase.Aim || !carry)
+                foreach (var d in pressers)
+                    if (d != null && movers.ContainsKey(d)) Steer(d, Vector3.zero, 6f, dt, A.Ball.transform.position, 240f);
 
             switch (phase)
             {
@@ -455,7 +525,6 @@ namespace Camisa10.UI
             }
         }
 
-        bool swelled;
         Vector3 footAnchor;
         bool footAnchored;
 
@@ -470,12 +539,19 @@ namespace Camisa10.UI
 
         void UpdateRigs()
         {
-            if (mate != null) Rig(mate).Set(mateHasBall || HorizDist(mate.position, mateTarget) < .05f ? PersonRig.Mode.Idle : PersonRig.Mode.Run, mateSpeed);
+            // a animação (parado, andando, correndo) sai da velocidade real de cada um
+            if (mate != null && Rig(mate).mode != PersonRig.Mode.Celebrate) Rig(mate).Set(PersonRig.Mode.Run, mateSpeed);
             if (marker != null) Rig(marker).Set(PersonRig.Mode.Run, 4.2f);
             foreach (var d in pressers)
             {
+                var mv = Mv(d);
                 bool stunned = stunUntil.TryGetValue(d, out var until) && Time.time < until;
-                Rig(d).Set(stunned ? PersonRig.Mode.Stumble : phase == Phase.Aim && carry ? PersonRig.Mode.Run : PersonRig.Mode.Ready, d == chaser ? chaserSpeed : presserSpeed);
+                bool falling = stunned && until - Time.time > .45f;
+                bool close = HorizDist(d.position, A.Ball.transform.position) < 4f;
+                var mode = mv.lunging || falling ? PersonRig.Mode.Stumble
+                    : phase == Phase.Aim && carry && close && !stunned ? PersonRig.Mode.Ready
+                    : PersonRig.Mode.Run;
+                Rig(d).Set(mode, d == chaser ? chaserSpeed : presserSpeed);
             }
             if (attacker != null && (phase == Phase.Aim || attackerRunsOn)) Rig(attacker).Set(PersonRig.Mode.Run, attackerSpeed);
             if (phase == Phase.Aim) PlaceFoot();
@@ -501,63 +577,201 @@ namespace Camisa10.UI
         void CarryStep(float dt)
         {
             if (Time.time < introUntil) return;
-            var b = Flat(A.Ball.transform.position);
             Vector2 st = hud.Stick.Value;
             bool sprint = hud.Sprint.Held && stamina > .02f;
             stamina = Mathf.Clamp01(stamina + (sprint ? -.42f : .16f) * dt);
             hud.SetStamina(stamina);
+            float dri01 = Mathf.Clamp01((Stat(Attr.Dri) - 40f) / 55f);
 
             // o joystick é relativo à câmera, que sempre olha para o gol: para cima = em direção ao gol
             var want = new Vector3(st.x, 0, st.y);
             if (autoRun) want.z = Mathf.Max(want.z, .45f);
             if (want.sqrMagnitude > 1f) want.Normalize();
-            float speed = carrySpeed * (sprint ? 1.4f : 1f) * (Time.time < burstUntil ? 1.35f : 1f);
-            carryVel = Vector3.Lerp(carryVel, want * speed, 1f - Mathf.Exp(-7f * dt));
-            b += carryVel * dt;
-            b.x = Mathf.Clamp(b.x, -26f, 26f);
-            b.z = Mathf.Clamp(b.z, -45f, -5.5f);
 
-            // a bola vai alguns passos à frente, como na condução de verdade
-            float touch = carryVel.magnitude > .5f ? Mathf.Abs(Mathf.Sin(Time.time * 7f)) * .35f : 0;
-            var ballPos = b + (carryVel.sqrMagnitude > .01f ? carryVel.normalized : Vector3.forward) * (.15f + touch);
-            SetBall(ballPos);
-            var toGoal = Flat(new Vector3(0, 0, 0) - b).normalized;
-            var eye = b - toGoal * 2.3f + Vector3.up * (1.62f + (carryVel.magnitude > 1 ? Mathf.Sin(Time.time * 12f) * .03f : 0));
-            A.PlaceCamera(eye, new Vector3(b.x * .35f, .9f, 0));
+            var b = Flat(A.Ball.transform.position);
+            var toBall = b - me;
+            float db = toBall.magnitude;
 
-            // marcadores: correm para cortar o caminho; o carrinho tem chance, não é certeiro
+            // o corpo segue o joystick, mas puxa para a bola quando ela se afasta (ninguém larga a bola de propósito)
+            var moveDir = want;
+            if (db > .3f && want.sqrMagnitude > .01f)
+                moveDir = Vector3.Lerp(want, toBall / db * Mathf.Max(want.magnitude, .7f), Mathf.Clamp01((db - .3f) / .3f));
+
+            float top = carrySpeed * (sprint ? 1.4f : 1f) * (Time.time < burstUntil ? 1.35f : 1f);
+            var target = moveDir * top;
+            // arranca em meio segundo, freia mais rápido e perde velocidade em curva fechada
+            if (carryVel.sqrMagnitude > 1f && target.sqrMagnitude > .01f)
+            {
+                float ang = Vector3.Angle(carryVel, target);
+                if (ang > 50f) target *= Mathf.Lerp(1f, .5f, (ang - 50f) / 130f);
+            }
+            float acc = target.sqrMagnitude < carryVel.sqrMagnitude ? 12f : 7.5f + dri01 * 2f;
+            carryVel = Vector3.MoveTowards(carryVel, target, acc * dt);
+            me += carryVel * dt;
+            me.x = Mathf.Clamp(me.x, -26f, 26f);
+            me.z = Mathf.Clamp(me.z, -45f, -5.5f);
+
+            // bola: rola na grama e perde velocidade
+            ballVel *= Mathf.Exp(-.85f * dt);
+            b += ballVel * dt;
+            toBall = b - me; db = toBall.magnitude;
+            float spd = carryVel.magnitude;
+            if (db < .62f && Time.time - lastTouch > .2f && (spd > .7f || want.sqrMagnitude > .04f))
+            {
+                // toque: empurra a bola para onde o joystick aponta; em velocidade o toque é mais longo
+                var dirT = want.sqrMagnitude > .01f ? want.normalized : carryVel.normalized;
+                // mudando de direção o toque é curto: só a velocidade que já vai para o novo lado empurra a bola
+                float push = Mathf.Max(Vector3.Dot(carryVel, dirT), 1.8f) * (sprint ? 1.55f : 1.3f) * R(.95f, 1.08f);
+                var perp = new Vector3(dirT.z, 0, -dirT.x);
+                ballVel = dirT * push + perp * (float)Rng.Gauss() * (sprint ? .45f : .2f) * (1.2f - dri01);
+                lastTouch = touchAt = Time.time;
+                sfx?.Touch(sprint ? .55f : .35f);
+            }
+            else if (db < 1.1f && want.sqrMagnitude < .04f && spd < 1.2f)
+            {
+                // sem joystick: domina a bola nos pés
+                ballVel = Vector3.Lerp(ballVel, Vector3.zero, 1f - Mathf.Exp(-8f * dt));
+                var hold = me + (toBall.sqrMagnitude > .01f ? toBall.normalized : Vector3.forward) * .5f;
+                b = Vector3.Lerp(b, hold, 1f - Mathf.Exp(-5f * dt));
+            }
+            if (Mathf.Abs(b.x) > 33f || b.z < -50f) { Finish(LiveOutcome.LostBall, "BOLA PARA FORA"); return; }
+            b.z = Mathf.Min(b.z, -4.5f);
+            RollBall(b, dt);
+
+            CarryCamera(b, sprint, dt);
+
+            // marcadores: leem com atraso, correm com aceleração, acompanham de frente e dão o bote na hora certa
             tackleCd -= dt;
             float nearest = 99;
+            bool anyLunge = false;
+            var goal = Vector3.zero;
             foreach (var d in pressers)
             {
                 if (d == null) continue;
+                var mv = Mv(d);
                 bool stunned = stunUntil.TryGetValue(d, out var until) && Time.time < until;
                 float dist = HorizDist(d.position, b);
-                if (!stunned) nearest = Mathf.Min(nearest, dist);
-                if (stunned) continue;
-                var target = b + carryVel * .35f;
                 float sp = d == chaser ? chaserSpeed : presserSpeed;
-                d.position = Vector3.MoveTowards(d.position, Flat(target), sp * dt);
-                Face(d, b);
-                if (dist < 1.05f && tackleCd <= 0)
-                {
-                    tackleCd = .9f;
-                    float p = Mathf.Clamp(.4f + opp01 * .2f - (Stat(Attr.Dri) - 50) * .006f - (sprint ? 0 : .05f), .12f, .65f);
-                    if (Rng.Chance(p)) { Finish(LiveOutcome.LostBall, "DESARMADO"); return; }
-                    stunUntil[d] = Time.time + .7f; // errou o bote
-                }
-            }
-            hud.DribbleReady(nearest < 3.2f);
+                mv.seenBall = Vector3.Lerp(mv.seenBall, b, 1f - Mathf.Exp(-dt / mv.react));
+                mv.seenVel = Vector3.Lerp(mv.seenVel, carryVel, 1f - Mathf.Exp(-dt / mv.react));
 
-            // o goleiro sai do gol quando você entra na área (e a torcida levanta)
+                if (stunned)
+                {
+                    // passou do lance: escorrega com o embalo e só depois se recompõe
+                    Steer(d, Vector3.zero, 5f, dt, null, 120f);
+                    continue;
+                }
+                nearest = Mathf.Min(nearest, dist);
+
+                if (mv.lunging)
+                {
+                    anyLunge = true;
+                    Steer(d, mv.lungeDir * (sp * 1.3f + 1.2f), 28f, dt, null, 200f);
+                    if (dist < .78f)
+                    {
+                        mv.lunging = false;
+                        float p = Mathf.Clamp(.42f + opp01 * .2f - (Stat(Attr.Dri) - 50) * .006f + (db > 1.2f ? .25f : 0f) - (sprint ? 0 : .05f), .12f, .8f);
+                        if (Rng.Chance(p))
+                        {
+                            ballVel = mv.vel * .8f + new Vector3(R(-1.5f, 1.5f), 0, 0);
+                            RollBall(b + ballVel * dt, dt);
+                            sfx?.Touch(.6f);
+                            Finish(LiveOutcome.LostBall, db > 1.2f ? "TOQUE LONGO DEMAIS" : "DESARMADO");
+                            return;
+                        }
+                        stunUntil[d] = Time.time + .9f; // errou o bote e passou direto
+                    }
+                    else if (Time.time > mv.lungeUntil) { mv.lunging = false; stunUntil[d] = Time.time + .55f; }
+                    continue;
+                }
+
+                // bola solta longe do seu pé: quem chegar primeiro leva
+                if (dist < .6f && db > 1.5f) { Finish(LiveOutcome.LostBall, "TOQUE LONGO DEMAIS"); return; }
+
+                Vector3 aim, face;
+                float speedCap = sp;
+                var toGoalB = Flat(goal - mv.seenBall).normalized;
+                if (dist > 4.5f)
+                {
+                    // longe: corre para cortar o caminho, mirando onde a bola vai estar
+                    aim = mv.seenBall + mv.seenVel * Mathf.Clamp(dist / Mathf.Max(1f, sp), 0, 1.2f) * .8f;
+                    if (d != chaser) aim = Vector3.Lerp(aim, mv.seenBall + toGoalB * 2f, .4f); // zagueiro guarda a posição
+                    face = aim;
+                }
+                else
+                {
+                    // perto: fica entre a bola e o gol, de frente, recuando no seu ritmo (jockey)
+                    aim = mv.seenBall + toGoalB * Mathf.Lerp(1.2f, 1.9f, (dist - 1f) / 3.5f) + mv.seenVel * .25f;
+                    speedCap = Mathf.Min(sp, Mathf.Max(mv.seenVel.magnitude * 1.08f, 1.8f));
+                    face = b;
+                }
+                var dv = Arrive(d.position, aim, speedCap, 1f);
+                // virar o corpo custa velocidade (só quando corre de frente)
+                if (dist > 4.5f && dv.sqrMagnitude > .01f)
+                    dv *= Mathf.Lerp(.45f, 1f, (Vector3.Dot(d.forward, dv.normalized) + 1f) * .5f);
+                Steer(d, dv, dist > 4.5f ? 6.5f + opp01 * 2f : 9f, dt, face, dist > 4.5f ? 300f : 520f);
+
+                // o bote: perto, de frente e quando ele achar a hora (às vezes antes, às vezes espera)
+                if (dist < 1.9f && Time.time > mv.nextLunge && tackleCd <= 0)
+                {
+                    mv.lunging = true;
+                    mv.lungeUntil = Time.time + .38f;
+                    mv.lungeDir = Flat(b + ballVel * .2f - d.position).normalized;
+                    mv.nextLunge = Time.time + R(1.2f, 2.2f) / mv.aggr;
+                    tackleCd = .6f;
+                    anyLunge = true;
+                }
+                else if (dist < 3f && Time.time > mv.nextLunge - .1f && db > 1.2f) mv.nextLunge = Time.time; // toque longo convida o bote
+            }
+            hud.DribbleReady(nearest < 3.2f || anyLunge);
+
+            // o goleiro sai do gol quando você entra na área, fechando o ângulo
             if (b.z > -16f)
             {
-                if (!swelled) { swelled = true; Sfx.Swell(.25f, 2.5f); }
-                keeper.position = Vector3.MoveTowards(keeper.position, new Vector3(b.x * .5f, 0, Mathf.Max(b.z + 2.2f, -5f)), (2.6f + opp01 * 1.2f) * dt);
-                Face(keeper, b);
+                var spot = new Vector3(b.x * .5f, 0, Mathf.Max(b.z + 2.2f, -5f));
+                Steer(keeper, Arrive(keeper.position, spot, 3f + opp01 * 1.4f, 1.2f), 9f, dt, b, 360f);
                 keeperZ = keeper.position.z;
                 if (HorizDist(keeper.position, b) < 1.15f) Finish(LiveOutcome.Saved, "O GOLEIRO FICOU COM ELA");
             }
+            else
+            {
+                // fora da área, ele acompanha o ângulo da bola em pequenos passos
+                var spot = new Vector3(Mathf.Clamp(b.x * .12f, -1.2f, 1.2f), 0, keeperZ);
+                Steer(keeper, Arrive(keeper.position, spot, 2f, .8f), 6f, dt, b, 300f);
+            }
+        }
+
+        /// <summary>Posiciona a bola no chão girando conforme rola.</summary>
+        void RollBall(Vector3 p, float dt)
+        {
+            var t = A.Ball.transform;
+            var prev = Flat(t.position);
+            SetBall(p);
+            var step = Flat(p) - prev;
+            float d = step.magnitude;
+            if (d > 1e-4f) t.rotation = Quaternion.AngleAxis(d / Arena.BallRadius * Mathf.Rad2Deg, Vector3.Cross(Vector3.up, step / d)) * t.rotation;
+        }
+
+        /// <summary>Câmera nos olhos do jogador: segue com leve atraso, balança com a passada e abre ao arrancar.</summary>
+        void CarryCamera(Vector3 b, bool sprint, float dt)
+        {
+            float spd = carryVel.magnitude;
+            stepPhase += dt * Mathf.Lerp(1.6f, 2.9f, Mathf.Clamp01(spd / 6f)) * (spd > .4f ? 1f : 0f);
+            float bobAmt = Mathf.Clamp01(spd / 5f);
+            var toGoal = Flat(Vector3.zero - me).normalized;
+            var side = new Vector3(toGoal.z, 0, -toGoal.x);
+            var eye = me - toGoal * 1.75f + Vector3.up * 1.64f
+                + Vector3.up * Mathf.Abs(Mathf.Sin(stepPhase * Mathf.PI)) * .045f * bobAmt
+                + side * Mathf.Sin(stepPhase * Mathf.PI) * .025f * bobAmt;
+            var look = new Vector3(Mathf.Lerp(b.x, 0, .55f), .9f, Mathf.Lerp(b.z, 0, .75f));
+            if (!camInit) { camLook = look; camInit = true; }
+            var pos = Vector3.SmoothDamp(A.Cam.transform.position, eye, ref camVel, .1f);
+            camLook = Vector3.Lerp(camLook, look, 1f - Mathf.Exp(-4f * dt));
+            A.PlaceCamera(pos, camLook);
+            fovBoost = Mathf.Lerp(fovBoost, sprint && spd > 3f ? 6f : 0f, 1f - Mathf.Exp(-3f * dt));
+            A.FovBoost = fovBoost;
+            // inclina levemente nas curvas
+            A.Cam.transform.rotation *= Quaternion.Euler(0, 0, -Vector3.Dot(carryVel, side) * .5f);
         }
 
         void ShootButton()
@@ -610,15 +824,23 @@ namespace Camisa10.UI
             }
             burstUntil = Time.time + .5f;
             if (near == null) return; // sem marcador perto: só uma arrancada
-            float p = Mathf.Clamp(.52f + (Stat(Attr.Dri) - 60) * .011f - opp01 * .18f, .25f, .88f);
+            // driblar no momento do bote é o certo: ele já se jogou e não volta
+            bool timing = Mv(near).lunging;
+            float p = Mathf.Clamp(.48f + (Stat(Attr.Dri) - 60) * .011f - opp01 * .18f + (timing ? .3f : 0f), .25f, .93f);
             if (Rng.Chance(p))
             {
-                stunUntil[near] = Time.time + 1.6f;
-                // corte para o lado contrário ao marcador
+                Mv(near).lunging = false;
+                stunUntil[near] = Time.time + (timing ? 1.8f : 1.3f);
+                // corte para o lado contrário ao marcador: bola e corpo saem juntos
                 float away = Mathf.Sign(b.x - near.position.x);
                 if (away == 0) away = 1;
-                carryVel += new Vector3(away * 4.5f, 0, 1.5f);
-                hud.Banner("PASSOU!", Theme.FeedGold);
+                var cut = new Vector3(away * 3.8f, 0, 2.2f);
+                ballVel = cut * 1.15f;
+                carryVel += cut * .8f;
+                lastTouch = touchAt = Time.time;
+                sfx?.Touch(.5f);
+                sfx?.Cheer(.35f);
+                hud.Banner(timing ? "QUE DRIBLE!" : "PASSOU!", Theme.FeedGold);
                 StartCoroutine(HideBanner(.6f));
             }
             else if (Rng.Chance(.5)) Finish(LiveOutcome.LostBall, "DESARMADO");
@@ -661,7 +883,9 @@ namespace Camisa10.UI
             var ap = attacker.position;
             float d = meZ - ap.z;
             var vel = cutStart > 0 ? new Vector3(cutSide * 4.5f, 0, attackerSpeed * .8f) : new Vector3(0, 0, attackerSpeed);
-            ap += vel * dt;
+            var amv = Mv(attacker);
+            amv.vel = Vector3.MoveTowards(amv.vel, vel, 14f * dt); // o corte tem arranque, não é um teletransporte
+            ap += amv.vel * dt;
             attacker.position = ap;
             if (phase != Phase.Done) SetBall(ap + new Vector3(cutStart > 0 ? cutSide * .3f : 0, 0, .7f));
             if (phase == Phase.Done) return;
@@ -680,6 +904,7 @@ namespace Camisa10.UI
             {
                 mateHasBall = true;
                 passFlight = false;
+                Mv(mate).vel *= .15f; // domina e para em cima da bola
                 A.Ball.isKinematic = true;
                 A.Ball.transform.position = Flat(mate.position) + mate.forward * .6f + Vector3.up * Arena.BallRadius;
                 phase = Phase.Watch;
@@ -698,7 +923,7 @@ namespace Camisa10.UI
             curveAccel = 0;
             mateShotFlight = true;
             Launch(A.Ball.transform.position, target, 22f);
-            Sfx.Play(Sfx.Kind.Kick, .6f);
+            sfx?.Kick(.6f);
             shotTime = Time.time;
             phase = Phase.Flight;
         }
@@ -742,7 +967,7 @@ namespace Camisa10.UI
         {
             var v = A.Ball.linearVelocity;
             A.Ball.linearVelocity = new Vector3(v.x * .4f + R(-3, 3), Mathf.Abs(v.y) * .5f + 1.5f, v.z * zFactor);
-            Sfx.Play(Sfx.Kind.Kick, .6f, .8f);
+            sfx?.Touch(.8f);
         }
 
         void CheckCrossings()
@@ -797,37 +1022,15 @@ namespace Camisa10.UI
             hud.ShowNow(false);
             hud.SetHint("");
             hud.Banner(customText ?? Label(o), Good(o) ? Theme.FeedGold : Color.white);
-            Reaction(o);
+            if (Good(o)) sfx?.Cheer(o == LiveOutcome.TackleWon ? .5f : 1f);
+            else if (o == LiveOutcome.Saved || o == LiveOutcome.Missed || o == LiveOutcome.Blocked || o == LiveOutcome.TeammateMissed) sfx?.Groan();
+            if (o == LiveOutcome.Goal || o == LiveOutcome.Assist) { sfx?.Whistle(); Sfx.Play(Sfx.Kind.Net, .8f); GameSettings.Buzz(); }
             if (o == LiveOutcome.Goal || o == LiveOutcome.Assist)
             {
                 if (mate != null) Rig(mate).Set(PersonRig.Mode.Celebrate);
                 StartCoroutine(Shake(.35f, .06f));
             }
             StartCoroutine(End(o));
-        }
-
-        /// <summary>Resposta da torcida (e vibração no gol).</summary>
-        static void Reaction(LiveOutcome o)
-        {
-            switch (o)
-            {
-                case LiveOutcome.Goal:
-                case LiveOutcome.Assist:
-                    Sfx.Play(Sfx.Kind.Net, .8f);
-                    Sfx.Play(Sfx.Kind.Roar);
-                    GameSettings.Buzz();
-                    break;
-                case LiveOutcome.Saved:
-                case LiveOutcome.Missed:
-                case LiveOutcome.TeammateMissed:
-                    Sfx.Play(Sfx.Kind.Ooh); break;
-                case LiveOutcome.Blocked:
-                    Sfx.Play(Sfx.Kind.Ooh, .6f); break;
-                case LiveOutcome.TackleWon:
-                    Sfx.Play(Sfx.Kind.Applause, .8f); break;
-                default:
-                    Sfx.Play(Sfx.Kind.Groan, .7f); break;
-            }
         }
 
         static bool Good(LiveOutcome o) => o == LiveOutcome.Goal || o == LiveOutcome.Assist || o == LiveOutcome.TackleWon;
@@ -870,7 +1073,6 @@ namespace Camisa10.UI
 
         void OnDestroy()
         {
-            Sfx.Crowd(false);
             if (A != null) A.Destroy();
             A = null;
         }

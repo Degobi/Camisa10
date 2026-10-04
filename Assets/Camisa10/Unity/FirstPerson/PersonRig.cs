@@ -98,6 +98,14 @@ namespace Camisa10.UI
         string clip = "idle", prevClip;
         float clipTime, prevTime, blend = 1;
         float wArms, wCrouch, wLean, wReady;
+
+        /// <summary>Para onde a cabeça olha (normalmente a bola).</summary>
+        public Transform LookAt;
+        // velocidade medida pelo deslocamento real: escolhe andar/correr e a cadência sem o pé "patinar"
+        Vector3 lastPos, moveVel, leanEuler;
+        bool posInit;
+        float lookYaw, bodyYaw;
+        int bNeck, bHead;
         int bSpine, bSpine1, bLArm, bLFore, bLHand, bRArm, bRFore, bRHand, bLUp, bLLeg, bLFoot, bRUp, bRLeg, bRFoot;
 
         void BuildHuman(HumanModel h, Color shirt, Color shorts, Color socks, Color boots, int number, bool keeper)
@@ -152,6 +160,7 @@ namespace Camisa10.UI
             bRArm = h.Bone("RightArm"); bRFore = h.Bone("RightForeArm"); bRHand = h.Bone("RightHand");
             bLUp = h.Bone("LeftUpLeg"); bLLeg = h.Bone("LeftLeg"); bLFoot = h.Bone("LeftFoot");
             bRUp = h.Bone("RightUpLeg"); bRLeg = h.Bone("RightLeg"); bRFoot = h.Bone("RightFoot");
+            bNeck = h.Bone("Neck"); bHead = h.Bone("Head");
             clipTime = idleSeed;
         }
 
@@ -166,22 +175,52 @@ namespace Camisa10.UI
             b.rotation = Quaternion.Slerp(Quaternion.identity, rot, w) * b.rotation;
         }
 
+        /// <summary>Velocidade horizontal real do jogador, em m/s.</summary>
+        public float MeasuredSpeed => moveVel.magnitude;
+
         void UpdateHuman(float dt)
         {
             if (mode != lastMode) { modeTime = 0; lastMode = mode; }
             modeTime += dt;
             float k = 1f - Mathf.Exp(-10f * dt);
 
-            string want = mode == Mode.Run ? "run" : "idle";
+            // mede o movimento de verdade (quem move o jogador é o lance, não a animação)
+            var pos = transform.position;
+            if (!posInit) { lastPos = pos; posInit = true; }
+            var inst = dt > 1e-4f ? (pos - lastPos) / dt : Vector3.zero;
+            inst.y = 0;
+            if (inst.sqrMagnitude > 15f * 15f) inst = moveVel; // teletransporte: ignora
+            lastPos = pos;
+            var prevVel = moveVel;
+            moveVel = Vector3.Lerp(moveVel, inst, 1f - Mathf.Exp(-12f * dt));
+            var accel = dt > 1e-4f ? (moveVel - prevVel) / dt : Vector3.zero;
+            float spd = moveVel.magnitude;
+
+            // parado, andando ou correndo conforme a velocidade, com folga para não ficar trocando
+            bool locomote = mode == Mode.Idle || mode == Mode.Run || mode == Mode.Ready || mode == Mode.Stumble;
+            float s = locomote ? spd : 0;
+            bool hasWalk = model.Clips.ContainsKey("walk");
+            string want;
+            if (clip == "run") want = s > 1.9f ? "run" : s > .3f && hasWalk ? "walk" : s > .3f ? "run" : "idle";
+            else if (clip == "walk") want = s > 2.5f ? "run" : s > .2f ? "walk" : "idle";
+            else want = s > 2.5f ? "run" : s > .45f ? (hasWalk ? "walk" : "run") : "idle";
             if (want != clip && model.Clips.ContainsKey(want))
             {
+                float frac = 0;
+                if (model.Clips.TryGetValue(clip, out var oldC) && clip != "idle") frac = Mathf.Repeat(clipTime, oldC.Length) / Mathf.Max(.01f, oldC.Length);
                 prevClip = clip; prevTime = clipTime;
-                clip = want; clipTime = want == "run" ? UnityEngine.Random.value : 0; blend = 0;
+                clip = want;
+                // mantém a fase da passada entre andar e correr; do parado, começa em um ponto qualquer
+                clipTime = want == "idle" ? idleSeed : (prevClip == "idle" ? UnityEngine.Random.value : frac) * model.Clips[want].Length;
+                blend = 0;
             }
-            float rate = clip == "run" ? Mathf.Clamp(speed / 3.6f, .75f, 1.7f) : 1f;
-            clipTime += dt * rate;
+            // anda de costas (marcador acompanhando, goleiro recuando): toca o ciclo ao contrário
+            float fwdDot = spd > .3f ? Vector3.Dot(moveVel / spd, transform.forward) : 1f;
+            float cycleDir = fwdDot < -.35f ? -1f : 1f;
+            float rate = clip == "run" ? Mathf.Clamp(s / 3.8f, .7f, 1.75f) : clip == "walk" ? Mathf.Clamp(s / 1.4f, .6f, 1.7f) : 1f;
+            clipTime += dt * rate * (clip == "idle" ? 1f : cycleDir);
             prevTime += dt;
-            blend = Mathf.Min(1, blend + dt / .2f);
+            blend = Mathf.Min(1, blend + dt / .25f);
 
             if (!model.Clips.TryGetValue(clip, out var c)) return;
             model.Sample(c, clipTime, poseA, out var hipsPos);
@@ -245,6 +284,29 @@ namespace Camisa10.UI
             var mp = modelRoot.localPosition;
             mp.y = Mathf.Lerp(mp.y, lift, mode == Mode.Jump ? 1 : k);
             modelRoot.localPosition = mp;
+
+            // corpo inclina como um pêndulo: para a frente ao arrancar e correr, para dentro nas curvas,
+            // para trás ao frear; de lado, os quadris giram um pouco na direção do passo
+            var right2 = transform.right; var fwd2 = transform.forward;
+            float aF = Vector3.Dot(accel, fwd2), aR = Vector3.Dot(accel, right2);
+            var leanT = locomote && mode != Mode.Stumble
+                ? new Vector3(Mathf.Clamp(spd * 1.6f + aF * 1.4f, -10f, 16f), 0, Mathf.Clamp(-aR * 2.2f, -16f, 16f))
+                : Vector3.zero;
+            leanEuler = Vector3.Lerp(leanEuler, leanT, 1f - Mathf.Exp(-6f * dt));
+            float sideMove = spd > .5f ? Vector3.Dot(moveVel / spd, right2) * cycleDir : 0;
+            bodyYaw = Mathf.Lerp(bodyYaw, locomote ? Mathf.Clamp(sideMove * (mode == Mode.Ready ? 20f : 55f), -55f, 55f) : 0, 1f - Mathf.Exp(-6f * dt));
+            modelRoot.localRotation = Quaternion.Euler(leanEuler.x, bodyYaw, leanEuler.z);
+
+            // cabeça acompanha a bola
+            if (LookAt != null && bHead >= 0)
+            {
+                var to = LookAt.position - bones[bHead].position; to.y = 0;
+                var f = modelRoot.forward; f.y = 0;
+                float ang = to.sqrMagnitude > .01f && f.sqrMagnitude > .01f ? Mathf.Clamp(Vector3.SignedAngle(f, to, Vector3.up), -60f, 60f) : 0;
+                lookYaw = Mathf.Lerp(lookYaw, ang, 1f - Mathf.Exp(-5f * dt));
+                if (bNeck >= 0) bones[bNeck].rotation = Quaternion.AngleAxis(lookYaw * .45f, Vector3.up) * bones[bNeck].rotation;
+                bones[bHead].rotation = Quaternion.AngleAxis(lookYaw * .45f, Vector3.up) * bones[bHead].rotation;
+            }
         }
 
         // ---------- número da camisa (fonte bitmap 3x5) ----------
