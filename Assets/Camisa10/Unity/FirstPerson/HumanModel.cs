@@ -105,13 +105,18 @@ namespace Camisa10.UI
                 int parts = r.ReadInt32();
                 mesh.subMeshCount = parts;
                 int spine2 = m.Bone("Spine2");
+                var tris = new int[parts][];
                 for (int p = 0; p < parts; p++)
                 {
                     int n = r.ReadInt32();
                     var tri = new int[n];
                     for (int i = 0; i < n; i++) tri[i] = r.ReadInt32();
                     mesh.SetTriangles(tri, p, false);
+                    tris[p] = tri;
                 }
+                SlimShorts(pos, tris);
+                mesh.vertices = pos;
+                mesh.uv = KitUVs(m, pos, bw, tris);
                 mesh.RecalculateBounds();
                 m.Mesh = mesh;
 
@@ -146,6 +151,95 @@ namespace Camisa10.UI
                 }
             }
             return m;
+        }
+
+        /// <summary>
+        /// O manequim original tem o quadril bufante; um calção de futebol é mais justo. Puxa os vértices do calção
+        /// (só os de dentro: as bordas são compartilhadas com a pele e ficam onde estão) para perto de cada perna.
+        /// </summary>
+        static void SlimShorts(Vector3[] pos, int[][] tris)
+        {
+            if (tris.Length <= (int)Part.Shorts) return;
+            var owner = new int[pos.Length];
+            for (int i = 0; i < owner.Length; i++) owner[i] = -1;
+            for (int p = 0; p < tris.Length; p++) foreach (var v in tris[p]) if (owner[v] < 0) owner[v] = p;
+            float cz = 0, legX = 0; int n = 0;
+            foreach (var v in tris[(int)Part.Shorts]) { cz += pos[v].z; legX += Mathf.Abs(pos[v].x); n++; }
+            if (n == 0) return;
+            cz /= n; legX = legX / n * .8f;
+            var done = new bool[pos.Length];
+            foreach (var v in tris[(int)Part.Shorts])
+            {
+                if (done[v] || owner[v] != (int)Part.Shorts) continue;
+                done[v] = true;
+                var q = pos[v];
+                float cx = Mathf.Sign(q.x) * legX;
+                q.x = cx + (q.x - cx) * .86f;
+                q.z = cz + (q.z - cz) * (q.z < cz ? .74f : .9f); // o "bumbum" do manequim é o que mais estufa
+                pos[v] = q;
+            }
+        }
+
+        // Regiões da textura da camisa (ver KitArt): tronco em v 0..TorsoV, mangas na faixa de cima.
+        public const float TorsoV = .8f, SleeveV0 = .84f;
+
+        /// <summary>
+        /// Coordenadas de textura para o uniforme (o modelo original não tem): a camisa é desenrolada em volta do tronco
+        /// (frente em u = 0,25 e costas em u = 0,75), as mangas vão para a faixa de cima ao longo do braço,
+        /// calção e meião em volta do corpo/da perna, com v na altura.
+        /// </summary>
+        static Vector2[] KitUVs(HumanModel m, Vector3[] pos, BoneWeight[] bw, int[][] tris)
+        {
+            int nv = pos.Length;
+            var uv = new Vector2[nv];
+            var part = new int[nv];
+            for (int i = 0; i < nv; i++) part[i] = -1;
+            for (int p = 0; p < tris.Length; p++)
+                foreach (var v in tris[p]) if (part[v] < 0) part[v] = p;
+
+            bool IsArm(int bone)
+            {
+                if (bone < 0 || bone >= m.Names.Length) return false;
+                var n = m.Names[bone];
+                return n.Contains("Arm") || n.Contains("Hand");
+            }
+
+            // limites de cada região na pose de repouso
+            float tMin = 99, tMax = -99, tz = 0; int tc = 0;
+            float aMin = 99, aMax = -99, sMin = 99, sMax = -99, kMin = 99, kMax = -99;
+            for (int i = 0; i < nv; i++)
+            {
+                var q = pos[i];
+                switch ((Part)Mathf.Max(0, part[i]))
+                {
+                    case Part.Shirt:
+                        if (IsArm(bw[i].boneIndex0)) { aMin = Mathf.Min(aMin, Mathf.Abs(q.x)); aMax = Mathf.Max(aMax, Mathf.Abs(q.x)); }
+                        else { tMin = Mathf.Min(tMin, q.y); tMax = Mathf.Max(tMax, q.y); tz += q.z; tc++; }
+                        break;
+                    case Part.Shorts: sMin = Mathf.Min(sMin, q.y); sMax = Mathf.Max(sMax, q.y); break;
+                    case Part.Socks: kMin = Mathf.Min(kMin, q.y); kMax = Mathf.Max(kMax, q.y); break;
+                }
+            }
+            tz = tc > 0 ? tz / tc : 0;
+            // sentido horário visto de cima: texto e números ficam legíveis (não espelhados)
+            float Around(Vector3 q, float cz) => Mathf.Repeat(-Mathf.Atan2(q.x, q.z - cz) / (2 * Mathf.PI) + .25f, 1f);
+            for (int i = 0; i < nv; i++)
+            {
+                var q = pos[i];
+                switch ((Part)Mathf.Max(0, part[i]))
+                {
+                    case Part.Shirt:
+                        if (IsArm(bw[i].boneIndex0))
+                            uv[i] = new Vector2(Mathf.InverseLerp(aMin, aMax, Mathf.Abs(q.x)), Mathf.Lerp(SleeveV0, 1f, Around(new Vector3(q.y, 0, q.z), tz)));
+                        else
+                            uv[i] = new Vector2(Around(q, tz), Mathf.InverseLerp(tMin, tMax, q.y) * TorsoV);
+                        break;
+                    case Part.Shorts: uv[i] = new Vector2(Around(q, tz), Mathf.InverseLerp(sMin, sMax, q.y)); break;
+                    case Part.Socks: uv[i] = new Vector2(.5f, Mathf.InverseLerp(kMin, kMax, q.y)); break;
+                    default: uv[i] = new Vector2(.5f, .5f); break;
+                }
+            }
+            return uv;
         }
 
         /// <summary>Pose do clipe no tempo t (em laço), em rotações locais por osso e posição do quadril.</summary>

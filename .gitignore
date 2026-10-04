@@ -19,3 +19,6 @@
 
 # capturas de tela geradas pelo editor
 /Capturas/
+
+# temporários do build Android (gerados pela Unity)
+/.utmp/

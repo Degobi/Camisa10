@@ -23,7 +23,7 @@ namespace Camisa10.UI
         static readonly Color[] Skins = { Theme.Hex("#F1C9A5"), Theme.Hex("#D9A27A"), Theme.Hex("#B07A52"), Theme.Hex("#8D5A3B"), Theme.Hex("#5C3A24") };
         static readonly Color[] Hairs = { Theme.Hex("#1B1410"), Theme.Hex("#3B2A1E"), Theme.Hex("#6B4A2B"), Theme.Hex("#C9A15A"), Theme.Hex("#111111") };
 
-        public static PersonRig Build(Transform parent, string name, Color shirt, Color shorts, Color socks, Color boots, int number, bool keeper)
+        public static PersonRig Build(Transform parent, string name, Color shirt, Color shorts, Color socks, Color boots, int number, bool keeper, Kit kit = null)
         {
             var root = new GameObject(name).transform;
             root.SetParent(parent, false);
@@ -33,7 +33,7 @@ namespace Camisa10.UI
             var human = HumanModel.Get();
             if (human != null)
             {
-                rig.BuildHuman(human, shirt, shorts, socks, boots, number, keeper);
+                rig.BuildHuman(human, shirt, shorts, socks, boots, number, keeper, kit);
                 return rig;
             }
 
@@ -108,7 +108,16 @@ namespace Camisa10.UI
         int bNeck, bHead;
         int bSpine, bSpine1, bLArm, bLFore, bLHand, bRArm, bRFore, bRHand, bLUp, bLLeg, bLFoot, bRUp, bRLeg, bRFoot;
 
-        void BuildHuman(HumanModel h, Color shirt, Color shorts, Color socks, Color boots, int number, bool keeper)
+        static readonly System.Collections.Generic.Dictionary<Texture, Material> kitMats = new System.Collections.Generic.Dictionary<Texture, Material>();
+
+        /// <summary>Material de tecido com a textura do uniforme (um por textura, reaproveitado entre partidas).</summary>
+        static Material Cloth(Texture t, float smooth)
+        {
+            if (kitMats.TryGetValue(t, out var m) && m != null) return m;
+            return kitMats[t] = Arena.TexMat(t, Vector2.one, smooth);
+        }
+
+        void BuildHuman(HumanModel h, Color shirt, Color shorts, Color socks, Color boots, int number, bool keeper, Kit kit)
         {
             model = h;
             modelRoot = new GameObject("Corpo").transform;
@@ -128,10 +137,20 @@ namespace Camisa10.UI
             var skin = Arena.Mat(skinC, .3f);
             var mats = new Material[h.Mesh.subMeshCount];
             Material M(HumanModel.Part p, Material m) { if ((int)p < mats.Length) mats[(int)p] = m; return m; }
-            M(HumanModel.Part.Shirt, Arena.Mat(shirt, .22f));
+            if (kit != null)
+            {
+                // uniforme de verdade: padrão do clube, gola, número e patrocinador pintados na textura
+                M(HumanModel.Part.Shirt, Cloth(KitArt.Shirt(kit, number), .18f));
+                M(HumanModel.Part.Shorts, Cloth(KitArt.Shorts(kit), .2f));
+                M(HumanModel.Part.Socks, Cloth(KitArt.Socks(kit), .08f));
+            }
+            else
+            {
+                M(HumanModel.Part.Shirt, Arena.Mat(shirt, .22f));
+                M(HumanModel.Part.Shorts, Arena.Mat(shorts, .22f));
+                M(HumanModel.Part.Socks, Arena.Mat(socks, .1f));
+            }
             M(HumanModel.Part.Skin, skin);
-            M(HumanModel.Part.Shorts, Arena.Mat(shorts, .22f));
-            M(HumanModel.Part.Socks, Arena.Mat(socks, .1f));
             M(HumanModel.Part.Boots, Arena.Mat(boots, .55f));
             M(HumanModel.Part.Hands, keeper ? Arena.Mat(Theme.Hex("#F5F5F5"), .2f) : skin);
             M(HumanModel.Part.Hair, Arena.Mat(Hairs[Rng.RangeInt(0, Hairs.Length - 1)], .35f));
@@ -148,7 +167,7 @@ namespace Camisa10.UI
 
             // número nas costas, preso ao peito
             int chest = h.Bone("Spine2");
-            if (chest >= 0)
+            if (chest >= 0 && kit == null)
             {
                 var back = Arena.Prim(PrimitiveType.Quad, modelRoot, h.BackNumber, new Vector3(.22f, .22f, 1f), NumberMat(number, shirt));
                 back.name = "Numero";
@@ -234,7 +253,7 @@ namespace Camisa10.UI
 
             // camadas por cima da captura: agachar, braços para cima, inclinar
             bool arms = mode == Mode.Jump || mode == Mode.Dive || mode == Mode.Celebrate;
-            wArms = Mathf.Lerp(wArms, arms ? 1 : 0, k);
+            wArms = Mathf.Lerp(wArms, arms ? 1 : 0, mode == Mode.Dive ? 1f - Mathf.Exp(-28f * dt) : k); // no mergulho os braços vão na hora
             wCrouch = Mathf.Lerp(wCrouch, mode == Mode.Ready ? 1 : mode == Mode.Stumble ? .7f : 0, k);
             wReady = Mathf.Lerp(wReady, mode == Mode.Ready ? 1 : 0, k);
             wLean = Mathf.Lerp(wLean, mode == Mode.Stumble ? 1 : 0, k);

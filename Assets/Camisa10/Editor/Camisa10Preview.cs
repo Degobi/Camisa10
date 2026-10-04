@@ -39,6 +39,8 @@ namespace Camisa10.EditorTools
             File.WriteAllBytes(Path.Combine(dir, "placas.png"), atlas.EncodeToPNG());
             ExportSounds(Path.Combine(dir, "sons"));
             CaptureMenus(dir);
+            SaveTex(KitArt.Shirt(Kit.For("Palmeiras", "#006437", "#FFFFFF"), 27), Path.Combine(dir, "camisa-palmeiras.png"));
+            SaveTex(KitArt.Shirt(Kit.For("Vasco da Gama", "#111111", "#FFFFFF"), 10), Path.Combine(dir, "camisa-vasco.png"));
             if (!string.IsNullOrEmpty(previous)) EditorSceneManager.OpenScene(previous);
             return dir;
         }
@@ -91,6 +93,22 @@ namespace Camisa10.EditorTools
             Object.DestroyImmediate(go);
         }
 
+        /// <summary>Salva qualquer textura (mesmo sem cópia na CPU) em PNG.</summary>
+        static void SaveTex(Texture t, string path)
+        {
+            var rt = RenderTexture.GetTemporary(t.width, t.height, 0, RenderTextureFormat.ARGB32);
+            Graphics.Blit(t, rt);
+            var prev = RenderTexture.active;
+            RenderTexture.active = rt;
+            var tex = new Texture2D(t.width, t.height, TextureFormat.RGB24, false);
+            tex.ReadPixels(new Rect(0, 0, t.width, t.height), 0, 0);
+            tex.Apply();
+            RenderTexture.active = prev;
+            RenderTexture.ReleaseTemporary(rt);
+            File.WriteAllBytes(path, tex.EncodeToPNG());
+            Object.DestroyImmediate(tex);
+        }
+
         /// <summary>Salva os sons sintetizados em WAV, para ouvir fora do jogo.</summary>
         static void ExportSounds(string dir)
         {
@@ -122,14 +140,25 @@ namespace Camisa10.EditorTools
             a.Ball.isKinematic = true;
             a.Ball.transform.position = new Vector3(4, Arena.BallRadius, -22);
 
-            Color red = Theme.Hex("#C8102E"), white = Color.white, navy = Theme.Hex("#0B1F4B");
-            var keeper = a.Person("Goleiro", Theme.Hex("#C6E03A"), Theme.Hex("#222222"), new Vector3(-.6f, 0, -.6f), 180, true);
+            var keeper = a.Person("Goleiro", Kit.Goalkeeper(), new Vector3(-.6f, 0, -.6f), 180);
             keeper.GetComponent<PersonRig>().Set(PersonRig.Mode.Ready);
             var ball = a.Ball.transform.position;
             Vector3 toGoal = (Vector3.zero - ball).normalized, perp = new Vector3(toGoal.z, 0, -toGoal.x), wallC = ball + toGoal * 9.15f;
             for (int i = 0; i < 4; i++)
-                a.Person("Barreira", navy, white, wallC + perp * ((i - 1.5f) * .55f) + new Vector3(.6f, 0, 0), 180);
-            var mate = a.Person("Companheiro", red, white, new Vector3(-6, 0, -15), 20);
+                a.Person("Barreira", Kit.For("Vasco da Gama", "#111111", "#FFFFFF"), wallC + perp * ((i - 1.5f) * .55f) + new Vector3(.6f, 0, 0), 180);
+            var mate = a.Person("Companheiro", Kit.For("Flamengo", "#C8102E", "#111111"), new Vector3(-6, 0, -15), 20);
+
+            // vitrine de uniformes: de frente e de costas, lado a lado
+            string[] clubs = { "Botafogo", "Palmeiras", "São Paulo", "Grêmio", "Fluminense", "Barcelona", "Arsenal", "Real Madrid" };
+            for (int i = 0; i < clubs.Length; i++)
+            {
+                var k = Kit.For(clubs[i], "#888888", "#FFFFFF");
+                a.Person(clubs[i], k, new Vector3(-7 + i * 2f, 0, -60), i % 2 == 0 ? 180 : 0);
+            }
+            // goleiro em pleno mergulho (pose montada à mão, só para a foto)
+            var diver = a.Person("Mergulho", Kit.Goalkeeper("#FF7A1A"), new Vector3(10, .35f, -60), 180);
+            diver.rotation = Quaternion.LookRotation(Vector3.back) * Quaternion.Euler(0, 0, 70);
+            diver.GetComponent<PersonRig>().Set(PersonRig.Mode.Dive);
             mate.GetComponent<PersonRig>().Set(PersonRig.Mode.Run, 6);
 
             foreach (var rig in Object.FindObjectsByType<PersonRig>())
@@ -158,6 +187,9 @@ namespace Camisa10.EditorTools
             Shot("2-area", new Vector3(-3, 1.65f, -12), new Vector3(0, 1f, 0));
             Shot("3-estadio", new Vector3(14, 1.7f, -30), new Vector3(-10, 4f, 0));
             Shot("4-jogador", mate.position + new Vector3(1.6f, 1.4f, 2.2f), mate.position + Vector3.up * 1f);
+            Shot("5-uniformes", new Vector3(0, 1.5f, -66.5f), new Vector3(0, 1.1f, -60));
+            Shot("5b-uniformes-perto", new Vector3(-4, 1.4f, -62.6f), new Vector3(-4, 1.15f, -60));
+            Shot("6-mergulho", new Vector3(10, 1.4f, -64.5f), new Vector3(9.4f, .9f, -60));
 
             a.Cam.targetTexture = null;
             rt.Release();

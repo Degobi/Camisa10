@@ -121,6 +121,56 @@ namespace Camisa10.UI
             return s;
         }
 
+        /// <summary>Anel (contorno de círculo) branco, para a mira e o tempo do cabeceio.</summary>
+        public static Sprite RingSprite()
+        {
+            if (cache.TryGetValue("ring", out var s)) return s;
+            const int S = 128;
+            var tex = NewTex(S, S);
+            var px = new Color32[S * S];
+            for (int y = 0; y < S; y++)
+                for (int x = 0; x < S; x++)
+                {
+                    float d = new Vector2(x + .5f - S / 2f, y + .5f - S / 2f).magnitude;
+                    float a = Mathf.Clamp01(1 - Mathf.Abs(d - (S / 2f - 7)) / 4.5f);
+                    px[y * S + x] = new Color32(255, 255, 255, (byte)(a * 255));
+                }
+            tex.SetPixels32(px);
+            tex.Apply();
+            s = Sprite.Create(tex, new Rect(0, 0, S, S), new Vector2(.5f, .5f), 100);
+            cache["ring"] = s;
+            return s;
+        }
+
+        /// <summary>Linhas de velocidade saindo do centro (transparente no meio), para a sensação de arrancada.</summary>
+        public static Sprite SpeedLinesSprite()
+        {
+            if (cache.TryGetValue("speed", out var s)) return s;
+            const int w = 512, h = 288;
+            var tex = NewTex(w, h);
+            var px = new Color32[w * h];
+            var rnd = new System.Random(5);
+            var rays = new float[180];
+            for (int i = 0; i < rays.Length; i++) rays[i] = rnd.NextDouble() < .4 ? (float)rnd.NextDouble() : 0;
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    float u = (x + .5f) / w * 2 - 1, v = ((y + .5f) / h * 2 - 1) * h / w;
+                    float r = Mathf.Sqrt(u * u + v * v);
+                    float ang = (Mathf.Atan2(v, u) / (2 * Mathf.PI) + .5f) * rays.Length;
+                    int i0 = (int)ang % rays.Length;
+                    float frac = ang - Mathf.Floor(ang);
+                    float ray = rays[i0] * Mathf.Clamp01(1 - Mathf.Abs(frac - .5f) * 3.2f);
+                    float a = ray * Mathf.SmoothStep(0, 1, Mathf.InverseLerp(.38f, .95f, r)) * .55f;
+                    px[y * w + x] = new Color32(255, 255, 255, (byte)(Mathf.Clamp01(a) * 255));
+                }
+            tex.SetPixels32(px);
+            tex.Apply();
+            s = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(.5f, .5f), 100);
+            cache["speed"] = s;
+            return s;
+        }
+
         /// <summary>Vinheta: preto transparente no centro escurecendo nas bordas (lente de câmera de TV).</summary>
         public static Sprite VignetteSprite()
         {

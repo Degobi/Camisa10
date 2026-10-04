@@ -20,6 +20,11 @@ namespace Camisa10.UI
     public class SwipePad : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler
     {
         public Action<SwipeData> OnSwipe;
+        /// <summary>Modo mira (falta, pênalti, cabeceio): arrastar move a mira em vez de chutar.</summary>
+        public bool AimMode;
+        /// <summary>Deslocamento do dedo em pixels a cada arraste (só no modo mira).</summary>
+        public Action<Vector2> OnAimDrag;
+        Vector2 last;
         readonly List<Vector2> points = new List<Vector2>();
         float startTime;
         bool down;
@@ -30,17 +35,22 @@ namespace Camisa10.UI
             points.Add(e.position);
             startTime = Time.unscaledTime;
             down = true;
+            last = e.position;
         }
 
         public void OnDrag(PointerEventData e)
         {
-            if (down) points.Add(e.position);
+            if (!down) return;
+            points.Add(e.position);
+            if (AimMode) OnAimDrag?.Invoke(e.position - last);
+            last = e.position;
         }
 
         public void OnPointerUp(PointerEventData e)
         {
             if (!down) return;
             down = false;
+            if (AimMode) return;
             points.Add(e.position);
             Vector2 a = points[0], b = points[points.Count - 1];
             float length = 0;

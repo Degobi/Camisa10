@@ -11,7 +11,7 @@ namespace Camisa10.UI
     /// a direção define o alvo, a velocidade define a força e a curva do traço define o efeito.
     /// Os atributos mudam precisão (finalização), força (físico), efeito (drible), passe e desarme.
     /// </summary>
-    public class Chance3D : MonoBehaviour
+    public partial class Chance3D : MonoBehaviour
     {
         const float Gravity = 9.81f;
         enum Phase { Aim, Flight, Watch, Done }
@@ -31,10 +31,9 @@ namespace Camisa10.UI
         Vector3 prevBall;
         float curveAccel;
 
-        // goleiro
+        // goleiro (o mergulho fica em Goalkeeper)
         Transform keeper;
-        float keeperZ = -.6f, kReact, kSpeed, kMax, kStartX, kTargetX, kTargetY;
-        bool kCommitted;
+        float keeperZ = -.6f;
 
         // defensores que podem bloquear
         readonly List<Transform> blockers = new List<Transform>();
@@ -106,14 +105,11 @@ namespace Camisa10.UI
             Debug.Log($"[Camisa 10] Lance 3D: câmera {(A.Cam.enabled ? "ligada" : "desligada")}, imagem {A.View.width}x{A.View.height}, " +
                 $"{UnityEngine.Object.FindObjectsByType<Renderer>().Length} objetos visíveis na cena.");
 
-            Color oppShirt = Theme.Hex(m.Opp.c1), oppShorts = Theme.Hex(m.Opp.c2);
-            Color myShirt = Theme.Hex(m.My.c1), myShorts = Theme.Hex(m.My.c2);
+            var oppKit = Kit.For(m.Opp.name, m.Opp.c1, m.Opp.c2);
+            var myKit = Kit.For(m.My.name, m.My.c1, m.My.c2);
 
-            keeper = A.Person("Goleiro", Theme.Hex("#C6E03A"), Theme.Hex("#222222"), new Vector3(0, 0, keeperZ), 180, true);
+            keeper = A.Person("Goleiro", Kit.Goalkeeper(KeeperColor(oppKit, myKit)), new Vector3(0, 0, keeperZ), 180);
             Rig(keeper).Set(PersonRig.Mode.Ready);
-            kReact = Mathf.Lerp(.34f, .16f, opp01);
-            kSpeed = Mathf.Lerp(3.2f, 4.6f, opp01);
-            kMax = Mathf.Lerp(2.1f, 2.7f, opp01);
 
             if (m.Home) hud.SetScore(m.Minute, m.My.name, Theme.Hex(m.My.c1), m.Gf, m.Ga, m.Opp.name, Theme.Hex(m.Opp.c1));
             else hud.SetScore(m.Minute, m.Opp.name, Theme.Hex(m.Opp.c1), m.Ga, m.Gf, m.My.name, Theme.Hex(m.My.c1));
@@ -126,22 +122,38 @@ namespace Camisa10.UI
                     PlaceBallAndCamera(b);
                     keeperZ = -2.6f;
                     keeper.position = new Vector3(b.x * .3f, 0, keeperZ);
-                    kMax += .3f;
                     carry = true; carrySpeed = 3.4f + Stat(Attr.Vel) * .02f; aimTimeout = 12;
-                    hint = "Cara a cara! Conduza com o joystick, toque em CHUTAR ou deslize o dedo para mirar no canto.";
+                    hint = "Cara a cara! Conduza e SEGURE CHUTAR para a força; o joystick escolhe o canto.";
                     break;
                 }
                 case "falta":
                 {
-                    var b = new Vector3(R(-7, 7), 0, -R(20, 26));
+                    // distância e ângulo variados; barreira maior quanto mais perto
+                    var b = new Vector3(R(-12, 12), 0, -R(18, 30));
                     PlaceBallAndCamera(b);
                     Vector3 dir = (Vector3.zero - b).normalized, perp = new Vector3(dir.z, 0, -dir.x), wallC = b + dir * 9.15f;
                     float nearSide = b.x >= 0 ? 1 : -1;
-                    for (int i = 0; i < 4; i++)
-                        blockers.Add(A.Person("Barreira", oppShirt, oppShorts, wallC + perp * ((i - 1.5f) * .55f) + new Vector3(nearSide * .6f, 0, 0), 180));
+                    int wall = b.z > -22 ? 5 : b.z > -27 ? 4 : 3;
+                    if (Mathf.Abs(b.x) > 9) wall = Mathf.Max(2, wall - 2);
+                    for (int i = 0; i < wall; i++)
+                        blockers.Add(A.Person("Barreira", oppKit, wallC + perp * ((i - (wall - 1) / 2f) * .55f) + new Vector3(nearSide * .5f, 0, 0), 180));
                     wallJump = true;
                     keeper.position = new Vector3(-nearSide * .7f, 0, keeperZ);
-                    hint = "Falta! Deslize curvando o dedo para contornar a barreira, ou toque em CHUTAR.";
+                    aimPoint = new Vector3(-nearSide * 2.6f, 1.9f, 0);
+                    aimTimeout = 25;
+                    hint = "Falta! Arraste o dedo para mirar, escolha o EFEITO e SEGURE CHUTAR para a força. Solte para bater.";
+                    break;
+                }
+                case "penalti":
+                {
+                    var b = new Vector3(0, 0, -11);
+                    SetBall(b);
+                    A.PlaceCamera(b + new Vector3(-.5f, 1.6f, -2.6f), new Vector3(0, 1f, 0));
+                    keeperZ = -.25f;
+                    keeper.position = new Vector3(0, 0, keeperZ);
+                    aimPoint = new Vector3(R(-1.5f, 1.5f), 1f, 0);
+                    aimTimeout = 25;
+                    hint = "Pênalti! Arraste o dedo para mirar no canto e SEGURE CHUTAR. Solte na faixa verde: força demais isola.";
                     break;
                 }
                 case "contra":
@@ -151,7 +163,7 @@ namespace Camisa10.UI
                     carry = true; autoRun = true;
                     carrySpeed = 4.8f + Stat(Attr.Vel) * .03f;
                     float side = Rng.Chance(.5) ? 1 : -1;
-                    chaser = A.Person("Zagueiro", oppShirt, oppShorts, b + new Vector3(side * 6, 0, -2.5f), 0);
+                    chaser = A.Person("Zagueiro", oppKit, b + new Vector3(side * 6, 0, -2.5f), 0);
                     chaserSpeed = carrySpeed * (.92f + opp01 * .12f);
                     pressers.Add(chaser);
                     aimTimeout = 20;
@@ -163,11 +175,11 @@ namespace Camisa10.UI
                     var b = new Vector3(R(-8, 8), 0, -36);
                     PlaceBallAndCamera(b);
                     float side = Rng.Chance(.5) ? 1 : -1;
-                    mate = A.Person("Companheiro", myShirt, myShorts, new Vector3(side * R(6, 12), 0, -26), 0);
+                    mate = A.Person("Companheiro", myKit, new Vector3(side * R(6, 12), 0, -26), 0);
                     mateTarget = new Vector3(side * R(1, 5), 0, -11);
                     mateSpeed = 5.5f;
-                    marker = A.Person("Zagueiro", oppShirt, oppShorts, mate.position + new Vector3(-side * 2, 0, 2), 180);
-                    blockers.Add(A.Person("Zagueiro", oppShirt, oppShorts, new Vector3(b.x * .5f + R(-2, 2), 0, -22), 180));
+                    marker = A.Person("Zagueiro", oppKit, mate.position + new Vector3(-side * 2, 0, 2), 180);
+                    blockers.Add(A.Person("Zagueiro", oppKit, new Vector3(b.x * .5f + R(-2, 2), 0, -22), 180));
                     pressers.Add(blockers[blockers.Count - 1]);
                     carry = true; carrySpeed = 3.6f + Stat(Attr.Vel) * .02f; aimTimeout = 16;
                     hint = "Toque em PASSE para lançar o companheiro, ou conduza e arrisque o chute.";
@@ -180,7 +192,7 @@ namespace Camisa10.UI
                     float side = Rng.Chance(.5) ? 1 : -1;
                     SetBall(new Vector3(side * 33.5f, 0, -.5f));
                     crossLaunchAt = Time.time + .8f;
-                    blockers.Add(A.Person("Zagueiro", oppShirt, oppShorts, new Vector3(headPoint.x + side * .9f, 0, headPoint.z + .8f), 180));
+                    blockers.Add(A.Person("Zagueiro", oppKit, new Vector3(headPoint.x + side * .9f, 0, headPoint.z + .8f), 180));
                     aimTimeout = 99;
                     hint = "Escanteio! Quando aparecer AGORA, toque em CABECEAR ou deslize para o canto.";
                     break;
@@ -190,7 +202,7 @@ namespace Camisa10.UI
                     var me = new Vector3(R(-4, 4), 0, -14);
                     meZ = me.z;
                     A.PlaceCamera(me + new Vector3(0, 1.7f, 0), me + new Vector3(0, 1f, -10));
-                    attacker = A.Person("Atacante", oppShirt, oppShorts, me + new Vector3(R(-1.5f, 1.5f), 0, -16), 0);
+                    attacker = A.Person("Atacante", oppKit, me + new Vector3(R(-1.5f, 1.5f), 0, -16), 0);
                     SetBall(attacker.position + new Vector3(0, 0, .7f));
                     attackerSpeed = 5.5f + opp01 * 1.5f;
                     cutSide = Rng.Chance(.5) ? 1 : -1;
@@ -202,29 +214,31 @@ namespace Camisa10.UI
                 {
                     var b = new Vector3(R(-7, 7), 0, -R(15, 19));
                     PlaceBallAndCamera(b);
-                    blockers.Add(A.Person("Zagueiro", oppShirt, oppShorts,
+                    blockers.Add(A.Person("Zagueiro", oppKit,
                         Vector3.Lerp(b, new Vector3(0, 0, -.5f), .28f) + new Vector3(R(-1.2f, 1.2f), 0, 0), 180));
                     float side = b.x > 0 ? -1 : 1;
-                    mate = A.Person("Companheiro", myShirt, myShorts, new Vector3(b.x + side * R(7, 10), 0, b.z + 2), 0);
+                    mate = A.Person("Companheiro", myKit, new Vector3(b.x + side * R(7, 10), 0, b.z + 2), 0);
                     mateTarget = new Vector3(side * R(2, 5), 0, -8);
                     mateSpeed = 4.5f;
-                    marker = A.Person("Zagueiro", oppShirt, oppShorts, mate.position + new Vector3(-side * 1.5f, 0, 1.5f), 180);
+                    marker = A.Person("Zagueiro", oppKit, mate.position + new Vector3(-side * 1.5f, 0, 1.5f), 180);
                     pressers.Add(blockers[0]);
                     carry = true; carrySpeed = 3.4f + Stat(Attr.Vel) * .02f; aimTimeout = 14;
-                    hint = "Conduza com o joystick e drible o zagueiro. CHUTAR ou deslize o dedo para mirar; PASSE para o companheiro.";
+                    hint = "Conduza e drible o zagueiro. SEGURE CHUTAR para a força (o joystick escolhe o canto) ou toque em PASSE.";
                     break;
                 }
             }
             presserSpeed = 2.8f + opp01 * 1.3f;
             hud.SetHint(hint);
             hud.Pad.OnSwipe = OnSwipe;
-            hud.Shoot.OnPress = ShootButton;
             hud.PassBtn.OnPress = PassButton;
             hud.Dribble.OnPress = DribbleButton;
             hud.TackleL.OnPress = () => TackleButton(-1);
             hud.TackleR.OnPress = () => TackleButton(1);
             hud.Controls(carry, type != "defesa", mate != null, pressers.Count > 0, carry, type == "defesa");
             if (type == "cabeceio") hud.Shoot.GetComponentInChildren<UnityEngine.UI.Text>().text = "CABECEAR";
+            if (type == "cabeceio") hint = "Escanteio! Arraste o dedo para mirar e toque em CABECEAR quando o anel fechar na bola.";
+            hud.SetHint(hint);
+            SetupShooting();
             foreach (var bl in blockers) Rig(bl).Set(wallJump ? PersonRig.Mode.Idle : PersonRig.Mode.Ready);
             if (type != "defesa" && type != "cabeceio") CreateFoot();
 
@@ -258,6 +272,21 @@ namespace Camisa10.UI
                 Seed = Mathf.Abs((home.id ?? home.name ?? "").GetHashCode()) % 1000,
                 Boards = StadiumStyle.DefaultBoards(brands),
             };
+        }
+
+        /// <summary>Cor da camisa do goleiro que não se confunde com nenhum dos dois times.</summary>
+        static string KeeperColor(Kit a, Kit b)
+        {
+            foreach (var hex in new[] { "#C6E03A", "#FF7A1A", "#2BD9FE", "#9B6BFF", "#222222" })
+            {
+                var c = Theme.Hex(hex);
+                bool clash = false;
+                foreach (var k in new[] { a, b })
+                    foreach (var col in k.Body)
+                        if (Mathf.Abs(c.r - col.r) + Mathf.Abs(c.g - col.g) + Mathf.Abs(c.b - col.b) < .6f) clash = true;
+                if (!clash) return hex;
+            }
+            return "#C6E03A";
         }
 
         // ---------- utilidades ----------
@@ -356,7 +385,6 @@ namespace Camisa10.UI
             A.Ball.position = start;
             A.Ball.linearVelocity = v;
             A.Ball.angularVelocity = new Vector3(R(-10, 10), -curveAccel * 3f, 0);
-            kCommitted = false;
             prevBall = A.Ball.transform.position;
         }
 
@@ -406,6 +434,8 @@ namespace Camisa10.UI
             phase = Phase.Flight;
             hud.SetHint("");
             hud.ShowNow(false);
+            hud.Reticle(false); hud.Timing(false); hud.Power(false);
+            gk.OnShot(start, A.Ball.linearVelocity, curveAccel, blockers.Count > 0, null);
         }
 
         void Pass(Vector3 groundPoint, float power01)
@@ -475,8 +505,9 @@ namespace Camisa10.UI
             float dt = Time.deltaTime;
             A.FitCamera();
             if (kickT >= 0) kickT += dt;
-            if (phase == Phase.Aim && Time.time < introUntil) { PlaceFoot(); return; }
+            if (phase == Phase.Aim && Time.time < introUntil) { PlaceFoot(); IntroRun(); return; }
             hud.EndIntro();
+            if (!carry) hud.SetSpeed(0);
             UpdateRigs();
 
             if (mate != null && !mateHasBall)
@@ -503,6 +534,7 @@ namespace Camisa10.UI
             {
                 case Phase.Aim:
                     if (carry) CarryStep(dt);
+                    if (phase == Phase.Aim) ShootingStep(dt);
                     if (type == "cabeceio") CrossStep();
                     if (type == "defesa") DefenseStep(dt);
                     if (phase == Phase.Aim && Time.time - startTime > aimTimeout) Finish(LiveOutcome.LostBall, "DEMOROU DEMAIS");
@@ -511,13 +543,14 @@ namespace Camisa10.UI
                     if (foot != null && kickT > .5f) { Destroy(foot.gameObject); foot = null; }
                     else PlaceFootKick();
                     if (passFlight) PassStep();
-                    else { KeeperUpdate(dt); CheckCrossings(); }
+                    else { gk.Tick(dt); CheckCrossings(); }
                     FollowBall(dt);
                     break;
                 case Phase.Watch:
                     FollowBall(dt);
                     break;
                 case Phase.Done:
+                    KeeperAfter(dt);
                     if (attackerRunsOn) DefenseStep(dt);
                     if (!A.Ball.isKinematic && A.Ball.transform.position.z > 1.7f) A.Ball.linearVelocity *= .9f; // a rede segura a bola
                     if (type != "defesa") FollowBall(dt);
@@ -673,6 +706,14 @@ namespace Camisa10.UI
                         float p = Mathf.Clamp(.42f + opp01 * .2f - (Stat(Attr.Dri) - 50) * .006f + (db > 1.2f ? .25f : 0f) - (sprint ? 0 : .05f), .12f, .8f);
                         if (Rng.Chance(p))
                         {
+                            // bote dentro da área: às vezes ele chega atrasado e derruba você
+                            if (b.z > -16.5f && Mathf.Abs(b.x) < 20.16f && Rng.Chance(.3f + (sprint ? .1f : 0f)))
+                            {
+                                Rig(d).Set(PersonRig.Mode.Stumble);
+                                sfx?.Whistle();
+                                Finish(LiveOutcome.PenaltyWon, "PÊNALTI!");
+                                return;
+                            }
                             ballVel = mv.vel * .8f + new Vector3(R(-1.5f, 1.5f), 0, 0);
                             RollBall(b + ballVel * dt, dt);
                             sfx?.Touch(.6f);
@@ -731,7 +772,7 @@ namespace Camisa10.UI
                 var spot = new Vector3(b.x * .5f, 0, Mathf.Max(b.z + 2.2f, -5f));
                 Steer(keeper, Arrive(keeper.position, spot, 3f + opp01 * 1.4f, 1.2f), 9f, dt, b, 360f);
                 keeperZ = keeper.position.z;
-                if (HorizDist(keeper.position, b) < 1.15f) Finish(LiveOutcome.Saved, "O GOLEIRO FICOU COM ELA");
+                if (HorizDist(keeper.position, b) < .95f) Finish(LiveOutcome.Saved, "O GOLEIRO FICOU COM ELA");
             }
             else
             {
@@ -769,37 +810,10 @@ namespace Camisa10.UI
             camLook = Vector3.Lerp(camLook, look, 1f - Mathf.Exp(-4f * dt));
             A.PlaceCamera(pos, camLook);
             fovBoost = Mathf.Lerp(fovBoost, sprint && spd > 3f ? 6f : 0f, 1f - Mathf.Exp(-3f * dt));
+            hud.SetSpeed(Mathf.Clamp01((spd - 3.2f) / 3.5f) * (sprint ? 1f : .5f));
             A.FovBoost = fovBoost;
             // inclina levemente nas curvas
             A.Cam.transform.rotation *= Quaternion.Euler(0, 0, -Vector3.Dot(carryVel, side) * .5f);
-        }
-
-        void ShootButton()
-        {
-            if (!CanAct()) return;
-            if (type == "cabeceio") { HeaderButton(); return; }
-            if (type == "defesa") return;
-            float kx = keeper.position.x;
-            float side = Mathf.Abs(kx) < .3f ? (Rng.Chance(.5) ? 1 : -1) : (kx > 0 ? -1 : 1);
-            var target = new Vector3(side * R(2.2f, 3.0f), R(.35f, 1.7f), 0);
-            float bend = 0;
-            if (type == "falta")
-            {
-                // por cima e com efeito para dentro, contornando a barreira
-                target = new Vector3(side * R(3.2f, 4f), R(1.7f, 2.2f), 0);
-                bend = -side * Mathf.Min(Screen.width, Screen.height) * .08f;
-            }
-            Shot(target, .62f, bend, Stat(Attr.Fin), 1f);
-        }
-
-        void HeaderButton()
-        {
-            if (!crossLaunched || Time.time < windowOpen - .05f) { Finish(LiveOutcome.Missed, "FORA DO TEMPO"); return; }
-            if (Time.time > windowClose) return;
-            A.Ball.isKinematic = true;
-            A.Ball.transform.position = headPoint;
-            float side = keeper.position.x > 0 ? -1 : 1;
-            Shot(new Vector3(side * R(2f, 3f), R(.3f, 1.2f), 0), .5f, 0, (Stat(Attr.Fin) + Stat(Attr.Fis)) / 2f, .72f);
         }
 
         void PassButton()
@@ -870,6 +884,7 @@ namespace Camisa10.UI
                 float arrive = Time.time + T;
                 windowOpen = arrive - .3f - Stat(Attr.Fis) * .002f;
                 windowClose = arrive + .12f;
+                headArrive = arrive;
             }
             if (!crossLaunched) return;
             hud.ShowNow(Time.time >= windowOpen && Time.time <= windowClose);
@@ -924,39 +939,12 @@ namespace Camisa10.UI
             mateShotFlight = true;
             Launch(A.Ball.transform.position, target, 22f);
             sfx?.Kick(.6f);
+            gk.OnShot(A.Ball.transform.position, A.Ball.linearVelocity, 0, false, null);
             shotTime = Time.time;
             phase = Phase.Flight;
         }
 
         // ---------- goleiro e checagens ----------
-        Vector3 Predict(float zPlane)
-        {
-            var p = A.Ball.transform.position; var v = A.Ball.linearVelocity;
-            float t = (zPlane - p.z) / Mathf.Max(.1f, v.z);
-            return new Vector3(p.x + v.x * t + .5f * curveAccel * t * t * .35f, p.y + v.y * t - .5f * Gravity * t * t, zPlane);
-        }
-
-        void KeeperUpdate(float dt)
-        {
-            if (!kCommitted && Time.time - shotTime >= kReact && A.Ball.linearVelocity.z > .5f)
-            {
-                var p = Predict(keeperZ);
-                kStartX = keeper.position.x;
-                kTargetX = Mathf.Clamp(p.x, kStartX - kMax, kStartX + kMax);
-                kTargetY = p.y;
-                kCommitted = true;
-            }
-            if (!kCommitted) return;
-            var kp = keeper.position;
-            kp.x = Mathf.MoveTowards(kp.x, kTargetX, kSpeed * dt);
-            float dive = Mathf.Clamp((kTargetX - kStartX) / Mathf.Max(.1f, kMax), -1f, 1f);
-            float lift = Mathf.Clamp(kTargetY - 1.3f, 0, .7f);
-            kp.y = Mathf.MoveTowards(kp.y, lift, 2f * dt);
-            keeper.position = kp;
-            keeper.rotation = Quaternion.Slerp(keeper.rotation, Quaternion.Euler(0, 180, dive * 65f), 6f * dt);
-            if (Mathf.Abs(dive) > .3f) Rig(keeper).Set(PersonRig.Mode.Dive);
-        }
-
         static Vector3 Cross(Vector3 a, Vector3 b, float z)
         {
             float t = Mathf.Abs(b.z - a.z) < 1e-4f ? 1 : (z - a.z) / (b.z - a.z);
@@ -987,18 +975,7 @@ namespace Camisa10.UI
                     }
                 }
             }
-            if (prevBall.z < keeperZ && b.z >= keeperZ)
-            {
-                var c = Cross(prevBall, b, keeperZ);
-                var k = keeper.position;
-                float reach = .55f + (Mathf.Abs(kTargetX - kStartX) > .6f ? .45f : 0f);
-                if (Mathf.Abs(c.x - k.x) <= reach && c.y <= 2.3f + k.y)
-                {
-                    Deflect(-.25f);
-                    Finish(LiveOutcome.Saved);
-                    return;
-                }
-            }
+            if (KeeperCheck(prevBall, b)) return;
             if (prevBall.z < 0 && b.z >= 0)
             {
                 var c = Cross(prevBall, b, 0);
@@ -1017,6 +994,8 @@ namespace Camisa10.UI
             if (phase == Phase.Done) return;
             if (mateShotFlight) o = o == LiveOutcome.Goal ? LiveOutcome.Assist : LiveOutcome.TeammateMissed;
             phase = Phase.Done;
+            charging = false;
+            hud.Power(false); hud.Reticle(false); hud.Timing(false); hud.Curve(false); hud.SetSpeed(0);
             hud.HideControls();
             hud.DribbleReady(false);
             hud.ShowNow(false);
@@ -1033,7 +1012,7 @@ namespace Camisa10.UI
             StartCoroutine(End(o));
         }
 
-        static bool Good(LiveOutcome o) => o == LiveOutcome.Goal || o == LiveOutcome.Assist || o == LiveOutcome.TackleWon;
+        static bool Good(LiveOutcome o) => o == LiveOutcome.Goal || o == LiveOutcome.Assist || o == LiveOutcome.TackleWon || o == LiveOutcome.PenaltyWon;
 
         static string Label(LiveOutcome o)
         {
@@ -1048,6 +1027,7 @@ namespace Camisa10.UI
                 case LiveOutcome.LostBall: return "PERDEU A BOLA";
                 case LiveOutcome.TackleWon: return "DESARMOU!";
                 case LiveOutcome.Beaten: return "ELE PASSOU";
+                case LiveOutcome.PenaltyWon: return "PÊNALTI!";
                 default: return "PARA FORA";
             }
         }

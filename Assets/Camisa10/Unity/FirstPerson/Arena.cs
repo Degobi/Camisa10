@@ -697,6 +697,16 @@ namespace Camisa10.UI
             return rig.transform;
         }
 
+        /// <summary>Jogador com o uniforme completo do clube (ou de goleiro, se kit.Keeper).</summary>
+        public Transform Person(string name, Kit kit, Vector3 pos, float yaw)
+        {
+            var boots = Theme.Hex(Rng.Chance(.5) ? "#151515" : Rng.Chance(.5) ? "#F5F5F5" : "#E8542B");
+            var rig = PersonRig.Build(Root, name, kit.Main, kit.Shorts, kit.Socks, boots, kit.Keeper ? 1 : Rng.RangeInt(2, 30), kit.Keeper, kit);
+            rig.transform.localPosition = pos;
+            rig.transform.localRotation = Quaternion.Euler(0, yaw, 0);
+            return rig.transform;
+        }
+
         public void PlaceCamera(Vector3 eye, Vector3 lookAt)
         {
             Cam.transform.position = eye;

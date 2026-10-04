@@ -13,7 +13,133 @@ namespace Camisa10.UI
         Image bannerBg;
         RawImage view;
 
-        public void SetView(Texture t) { view.texture = t; view.enabled = t != null; }
+        public void SetView(Texture t)
+        {
+            view.texture = t; view.enabled = t != null;
+            foreach (var b in blur) { b.texture = t; }
+        }
+
+        // ---------- efeito de velocidade: borrão de zoom (cópias da imagem ampliadas) e linhas ----------
+        readonly RawImage[] blur = new RawImage[2];
+        Image speedLines;
+        float speedNow;
+
+        /// <summary>0 = parado, 1 = arrancada máxima. Borrão radial e linhas de velocidade, como na corrida do I Am Playr.</summary>
+        public void SetSpeed(float v01)
+        {
+            speedNow = Mathf.Lerp(speedNow, Mathf.Clamp01(v01), 1f - Mathf.Exp(-8f * Time.deltaTime));
+            for (int i = 0; i < blur.Length; i++)
+            {
+                float k = speedNow * (i + 1);
+                blur[i].enabled = view.enabled && speedNow > .02f;
+                blur[i].color = new Color(1, 1, 1, .22f * speedNow);
+                blur[i].rectTransform.localScale = Vector3.one * (1f + .025f * k);
+            }
+            speedLines.enabled = speedNow > .05f;
+            speedLines.color = new Color(1, 1, 1, speedNow * .85f);
+            // as linhas "correm" para fora trocando de escala e girando um pouco a cada quadro
+            speedLines.rectTransform.localScale = Vector3.one * (1.05f + Mathf.Repeat(Time.time * 3.1f, .18f));
+            speedLines.rectTransform.localRotation = Quaternion.Euler(0, 0, Mathf.Floor(Time.time * 20f) * 37f % 6f - 3f);
+        }
+
+        // ---------- mira, força, efeito e tempo ----------
+        RectTransform aimRoot, reticle, timingRing;
+        Image powerFill, powerSweet;
+        GameObject powerGo, curveGo;
+        Text curveText;
+        public TouchButton CurveL, CurveR;
+
+        /// <summary>Mostra a mira na posição (0..1 da tela do lance).</summary>
+        public void Reticle(bool on, Vector2 viewport01 = default, Color? color = null)
+        {
+            reticle.gameObject.SetActive(on);
+            if (!on) return;
+            reticle.anchorMin = reticle.anchorMax = viewport01;
+            reticle.anchoredPosition = Vector2.zero;
+            var c = color ?? Color.white;
+            foreach (var g in reticle.GetComponentsInChildren<Graphic>()) g.color = new Color(c.r, c.g, c.b, g.color.a);
+            reticle.localScale = Vector3.one * (1f + .06f * Mathf.Sin(Time.time * 6f));
+        }
+
+        /// <summary>Anel do cabeceio: encolhe até o tamanho da mira; aperte quando os dois coincidirem.</summary>
+        public void Timing(bool on, Vector2 viewport01 = default, float scale = 1, bool perfect = false)
+        {
+            timingRing.gameObject.SetActive(on);
+            if (!on) return;
+            timingRing.anchorMin = timingRing.anchorMax = viewport01;
+            timingRing.anchoredPosition = Vector2.zero;
+            timingRing.localScale = Vector3.one * Mathf.Max(.2f, scale);
+            timingRing.GetComponent<Image>().color = perfect ? Theme.Turf : Theme.FeedGold;
+        }
+
+        /// <summary>Barra de força ao lado do botão de chute. sweet = faixa ideal (verde).</summary>
+        public void Power(bool on, float v01 = 0, float sweetMin = .55f, float sweetMax = .8f)
+        {
+            powerGo.SetActive(on);
+            if (!on) return;
+            powerFill.rectTransform.anchorMax = new Vector2(1, Mathf.Clamp01(v01));
+            powerFill.color = v01 > sweetMax ? Theme.Red : v01 >= sweetMin ? Theme.Turf : Theme.FeedGold;
+            powerSweet.rectTransform.anchorMin = new Vector2(0, sweetMin);
+            powerSweet.rectTransform.anchorMax = new Vector2(1, sweetMax);
+        }
+
+        /// <summary>Controle de efeito da falta (-3 a 3; negativo curva para a esquerda).</summary>
+        public void Curve(bool on, int value = 0)
+        {
+            curveGo.SetActive(on);
+            if (!on) return;
+            string arrows = value == 0 ? "SEM EFEITO" : (value < 0 ? new string('‹', -value) + "  ESQUERDA" : "DIREITA  " + new string('›', value));
+            curveText.text = arrows;
+        }
+
+        void BuildAim(Transform safe, RectTransform root)
+        {
+            // mira (fica no espaço da imagem do lance, não da área segura)
+            aimRoot = UIKit.Rect("Mira", root);
+            UIKit.Stretch(aimRoot);
+            reticle = UIKit.Rect("Alvo", aimRoot);
+            reticle.sizeDelta = new Vector2(96, 96);
+            var ring = UIKit.Img(reticle, Color.white, false, "Anel"); ring.sprite = Procedural.RingSprite(); UIKit.Stretch(ring.rectTransform); ring.raycastTarget = false;
+            var dot = UIKit.Img(reticle, Color.white, false, "Ponto"); dot.sprite = UIKit.Circle; dot.rectTransform.sizeDelta = new Vector2(14, 14); dot.raycastTarget = false;
+            reticle.gameObject.SetActive(false);
+            var tr = UIKit.Img(aimRoot, Theme.FeedGold, false, "Tempo");
+            tr.sprite = Procedural.RingSprite(); tr.raycastTarget = false;
+            timingRing = tr.rectTransform; timingRing.sizeDelta = new Vector2(110, 110);
+            timingRing.gameObject.SetActive(false);
+
+            // barra de força (à esquerda do botão de chute)
+            var pb = UIKit.Img(safe, new Color(0, 0, 0, .55f), true, "Forca");
+            powerGo = pb.gameObject;
+            var prt = pb.rectTransform;
+            prt.anchorMin = prt.anchorMax = new Vector2(1, 0);
+            prt.sizeDelta = new Vector2(44, 300); prt.anchoredPosition = new Vector2(-385, 260);
+            pb.raycastTarget = false;
+            powerSweet = UIKit.Img(pb.transform, Theme.Alpha(Theme.Turf, .28f), false, "Ideal");
+            powerSweet.raycastTarget = false;
+            powerSweet.rectTransform.offsetMin = powerSweet.rectTransform.offsetMax = Vector2.zero;
+            powerFill = UIKit.Img(pb.transform, Theme.Turf, true, "Nivel");
+            powerFill.raycastTarget = false;
+            var frt = powerFill.rectTransform;
+            frt.anchorMin = Vector2.zero; frt.anchorMax = new Vector2(1, 0); frt.offsetMin = new Vector2(5, 5); frt.offsetMax = new Vector2(-5, -5);
+            var pl = UIKit.Txt(pb.transform, "FORÇA", 22, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+            pl.rectTransform.anchorMin = new Vector2(.5f, 1); pl.rectTransform.anchorMax = new Vector2(.5f, 1);
+            pl.rectTransform.sizeDelta = new Vector2(120, 30); pl.rectTransform.anchoredPosition = new Vector2(0, 22);
+            powerGo.SetActive(false);
+
+            // efeito da falta (canto inferior esquerdo, no lugar do joystick)
+            var cg = UIKit.Rect("Efeito", safe);
+            curveGo = cg.gameObject;
+            cg.anchorMin = cg.anchorMax = Vector2.zero; cg.sizeDelta = new Vector2(520, 170); cg.anchoredPosition = new Vector2(320, 150);
+            CurveL = RoundButton(cg, "‹", Theme.Chip, Color.white, new Vector2(0, .5f), new Vector2(70, 0), 130, 64);
+            CurveR = RoundButton(cg, "›", Theme.Chip, Color.white, new Vector2(1, .5f), new Vector2(-70, 0), 130, 64);
+            var lab = UIKit.Txt(cg, "EFEITO", 22, Theme.Muted, FontStyle.Bold, TextAnchor.MiddleCenter);
+            lab.rectTransform.anchorMin = new Vector2(0, .5f); lab.rectTransform.anchorMax = new Vector2(1, .5f);
+            lab.rectTransform.sizeDelta = new Vector2(-260, 30); lab.rectTransform.anchoredPosition = new Vector2(0, 26);
+            curveText = UIKit.Txt(cg, "", 28, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+            curveText.rectTransform.anchorMin = new Vector2(0, .5f); curveText.rectTransform.anchorMax = new Vector2(1, .5f);
+            curveText.rectTransform.sizeDelta = new Vector2(-260, 40); curveText.rectTransform.anchoredPosition = new Vector2(0, -12);
+            curveGo.SetActive(false);
+        }
 
         public static ChanceHud Build(Transform canvas)
         {
@@ -27,6 +153,21 @@ namespace Camisa10.UI
             h.view.color = Color.white;
             h.view.raycastTarget = false;
             h.view.enabled = false;
+
+            // borrão de velocidade: cópias da imagem do campo, ampliadas e translúcidas
+            for (int i = 0; i < h.blur.Length; i++)
+            {
+                var bgo = UIKit.Rect("Borrao" + i, root);
+                UIKit.Stretch(bgo);
+                h.blur[i] = bgo.gameObject.AddComponent<RawImage>();
+                h.blur[i].raycastTarget = false;
+                h.blur[i].enabled = false;
+            }
+            h.speedLines = UIKit.Img(root, Color.white, false, "LinhasVelocidade");
+            h.speedLines.sprite = Procedural.SpeedLinesSprite();
+            UIKit.Stretch(h.speedLines.rectTransform);
+            h.speedLines.raycastTarget = false;
+            h.speedLines.enabled = false;
 
             // vinheta por cima da imagem do campo (bordas mais escuras, como lente de transmissão)
             var vig = UIKit.Img(root, Color.white, false, "Vinheta");
@@ -95,6 +236,7 @@ namespace Camisa10.UI
             outline.effectColor = new Color(0, 0, 0, .8f); outline.effectDistance = new Vector2(4, -4);
             h.now.gameObject.SetActive(false);
             h.BuildControls(safe);
+            h.BuildAim(safe, root);
             return h;
         }
 

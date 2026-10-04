@@ -7,7 +7,7 @@ namespace Camisa10.Core
     public enum StepResult { Continue, AwaitChoice, Finished }
 
     /// <summary>Resultado de um lance jogado em primeira pessoa (cena 3D).</summary>
-    public enum LiveOutcome { Goal, Saved, Missed, Blocked, Assist, TeammateMissed, PassIntercepted, LostBall, TackleWon, Beaten }
+    public enum LiveOutcome { Goal, Saved, Missed, Blocked, Assist, TeammateMissed, PassIntercepted, LostBall, TackleWon, Beaten, PenaltyWon }
 
     public class FeedLine { public string Text; public FeedKind Kind; }
 
@@ -185,14 +185,23 @@ namespace Camisa10.Core
             {
                 case LiveOutcome.Goal:
                     Gf++; Goals++; Rating += 1.1f; GoalFlash = true;
-                    Add($"{m}' GOL SEU! {(type == "cabeceio" ? "Cabeçada firme no canto!" : type == "falta" ? "Cobrança perfeita!" : Rng.Pick(GoalTexts))}", FeedKind.TeamGoal);
+                    Add($"{m}' GOL SEU! {(type == "cabeceio" ? "Cabeçada firme no canto!" : type == "falta" ? "Cobrança perfeita!" : type == "penalti" ? "Pênalti batido com categoria!" : Rng.Pick(GoalTexts))}", FeedKind.TeamGoal);
                     break;
+                case LiveOutcome.PenaltyWon:
+                    // a jogada continua: você mesmo vai para a cobrança
+                    Rating += .2f;
+                    Add($"{m}' Pênalti! Você é derrubado dentro da área e vai para a bola.", FeedKind.Me);
+                    Current = Build("penalti");
+                    return;
                 case LiveOutcome.Assist:
                     Gf++; Assists++; Rating += .7f; GoalFlash = true;
                     Add($"{m}' Gol do {My.name}! Assistência sua para {GameData.Outfield(My.name)}.", FeedKind.TeamGoal);
                     break;
-                case LiveOutcome.Saved: Rating -= .05f; Add($"{m}' Grande defesa de {GameData.Keeper(Opp.name)}, do {Opp.name}.", FeedKind.Me); break;
-                case LiveOutcome.Missed: Rating -= .2f; Add($"{m}' {(type == "cabeceio" ? "A cabeçada sai sem direção." : "O chute vai para fora.")}", FeedKind.Me); break;
+                case LiveOutcome.Saved:
+                    Rating -= type == "penalti" ? .5f : .05f;
+                    Add(type == "penalti" ? $"{m}' {GameData.Keeper(Opp.name)} defende o seu pênalti!" : $"{m}' Grande defesa de {GameData.Keeper(Opp.name)}, do {Opp.name}.", FeedKind.Me);
+                    break;
+                case LiveOutcome.Missed: Rating -= type == "penalti" ? .6f : .2f; Add($"{m}' {(type == "cabeceio" ? "A cabeçada sai sem direção." : type == "penalti" ? "Você isola o pênalti!" : "O chute vai para fora.")}", FeedKind.Me); break;
                 case LiveOutcome.Blocked: Rating -= .1f; Add($"{m}' A defesa bloqueia o chute.", FeedKind.Me); break;
                 case LiveOutcome.TeammateMissed: Rating += .15f; Add($"{m}' Belo passe seu, mas o companheiro desperdiça.", FeedKind.Me); break;
                 case LiveOutcome.PassIntercepted: Rating -= .25f; Add($"{m}' O passe não chega.", FeedKind.Me); break;
@@ -238,6 +247,8 @@ namespace Camisa10.Core
                 new[] { O("Dar o bote", "tackle", .5, .02, (Attr.Def, .8f), (Attr.Fis, .2f)), O("Acompanhar e fechar o espaço", "contain", .6, .018, (Attr.Def, .5f), (Attr.Vel, .5f)), O("Fazer falta tática", "foul", .9, 0, (Attr.Fis, 1f)) }),
             ["cabeceio"] = (new[] { "Escanteio a favor. Você sobe para a área.", "Falta lateral levantada na área. Você ataca a bola." },
                 new[] { O("Cabecear para o gol", "goal", .2, .01, (Attr.Fis, .5f), (Attr.Fin, .5f)), O("Escorar para o meio", "assist", .3, .012, (Attr.Pas, 1f)) }),
+            ["penalti"] = (new[] { "Pênalti a seu favor! A bola é sua.", "O árbitro aponta a marca da cal. Você pega a bola." },
+                new[] { O("Bater no canto", "goal", .66, .006, (Attr.Fin, 1f)), O("Bater forte no meio", "goal", .6, .005, (Attr.Fis, .5f), (Attr.Fin, .5f)) }),
             ["cara"] = (new[] { "Você fica cara a cara com o goleiro!" },
                 new[] { O("Chutar forte", "goal", .4, .012, (Attr.Fin, 1f)), O("Driblar o goleiro", "goal", .34, .012, (Attr.Dri, 1f)), O("Rolar para o companheiro", "assist", .55, .01, (Attr.Pas, 1f)) }),
         };

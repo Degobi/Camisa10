@@ -20,7 +20,11 @@ Não é gerenciador estilo Brasfoot: você controla um jogador, não um time.
 - `Assets/Camisa10/Core/` é **C# puro**, sem `using UnityEngine`. Regras, economia e simulação ficam aqui.
 - 3D em `Assets/Camisa10/Unity/FirstPerson/`: `Arena` (estádio com dois anéis, cobertura, placas de LED, dia ou noite
   via `StadiumStyle`), `StadiumArt` (texturas do estádio), `MeshBuilder` (junta peças repetidas numa malha só: no celular
-  cada objeto custa uma chamada de desenho), `PersonRig` (jogador), `Chance3D` (lance em primeira pessoa),
+  cada objeto custa uma chamada de desenho), `PersonRig` (jogador), `Kits` (uniforme real de cada clube: padrão, número,
+  patrocinador fictício; a malha ganha UVs em `HumanModel.KitUVs`), `Chance3D` (lance em primeira pessoa; a finalização
+  fica em `Chance3D.Shooting`: segurar CHUTAR carrega a força, falta/pênalti têm mira arrastável e efeito),
+  `Goalkeeper` (reação + mergulho físico; calibrado por simulação: goleiro médio defende ~50% de canto baixo com força a 18 m,
+  ~40% de ângulo, quase tudo no meio; pênalti com canto certo ~50%: mexa nos números testando a taxa, não no olho),
   `SwipePad` e `TouchControls` (entrada), `ChanceHud` (HUD do lance, placar estilo TV e vinheta).
   Movimento em campo com aceleração e bote (`Chance3D.Steer`), e o `PersonRig` escolhe parado/andando/correndo pela
   velocidade medida: mova o Transform, não force a animação.
@@ -51,7 +55,10 @@ Não é gerenciador estilo Brasfoot: você controla um jogador, não um time.
    Sem o editor aberto, fotografe o lance (dia e noite), os menus e exporte os sons em `Capturas/`:
    `Unity -batchmode -projectPath . -executeMethod Camisa10.EditorTools.Camisa10Preview.CaptureBatch -logFile -`
    (no editor: menu **Camisa 10 > Capturar imagens do lance**).
-3. Builds: menu **Camisa 10 > Configurar build Android** (paisagem, IL2CPP, ARM64).
+   Lances jogados de verdade (todos os tipos, em Play): `-executeMethod Camisa10.EditorTools.Camisa10SmokeTest.Run`
+   (menu **Camisa 10 > Testar lances automaticamente**). Com o editor aberto, rode numa cópia do projeto.
+3. Builds: menu **Camisa 10 > Gerar APK de teste** (gera `Builds/Camisa10.apk`). `Camisa10BuildPrep` roda antes de todo build:
+   sem ele o celular corta colisores e o shader (tela rosa), porque a cena é vazia e tudo nasce por código.
 
 ## Prioridades atuais (feedback do dono)
 - Visual realista (o dono rejeita arte desenhada por código). Jogadores: `PersonRig` usa o corpo com captura de movimento

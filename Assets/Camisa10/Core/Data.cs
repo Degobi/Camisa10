@@ -37,9 +37,9 @@ namespace Camisa10.Core
         public static readonly Dictionary<string, PositionDef> Positions = new Dictionary<string, PositionDef>
         {
             ["ATA"] = new PositionDef { Code = "ATA", Name = "Atacante", W = new[] { .35f, .1f, .2f, .2f, .15f, 0f }, Base = new[] { 53, 43, 49, 51, 47, 25 },
-                Moments = new[] { ("chance", .45), ("contra", .25), ("falta", .15), ("meio", .15) } },
+                Moments = new[] { ("chance", .42), ("contra", .23), ("falta", .15), ("meio", .14), ("penalti", .06) } },
             ["MEI"] = new PositionDef { Code = "MEI", Name = "Meia", W = new[] { .15f, .35f, .25f, .1f, .1f, .05f }, Base = new[] { 45, 53, 50, 47, 43, 35 },
-                Moments = new[] { ("chance", .25), ("meio", .4), ("contra", .2), ("falta", .15) } },
+                Moments = new[] { ("chance", .25), ("meio", .38), ("contra", .18), ("falta", .15), ("penalti", .04) } },
             ["VOL"] = new PositionDef { Code = "VOL", Name = "Volante", W = new[] { .05f, .3f, .05f, .05f, .25f, .3f }, Base = new[] { 37, 49, 41, 43, 51, 51 },
                 Moments = new[] { ("meio", .4), ("defesa", .45), ("chance", .15) } },
             ["ZAG"] = new PositionDef { Code = "ZAG", Name = "Zagueiro", W = new[] { 0f, .1f, 0f, .1f, .35f, .45f }, Base = new[] { 31, 41, 33, 43, 53, 53 },

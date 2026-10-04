@@ -37,6 +37,8 @@ namespace Camisa10.UI
     public class TouchButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerExitHandler
     {
         public Action OnPress;
+        /// <summary>Ao soltar o dedo (carregar a força do chute e soltar).</summary>
+        public Action OnRelease;
         public bool Held;
         Graphic g;
         Color baseColor;
@@ -55,7 +57,9 @@ namespace Camisa10.UI
 
         void Release()
         {
+            bool was = Held;
             Held = false;
+            if (was) OnRelease?.Invoke();
             if (g != null) g.color = baseColor;
         }
     }
