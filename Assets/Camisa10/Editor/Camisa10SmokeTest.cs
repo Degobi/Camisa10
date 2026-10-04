@@ -24,7 +24,7 @@ namespace Camisa10.EditorTools
             EditorApplication.update += Tick;
         }
 
-        static readonly string[] Types = { "penalti", "falta", "chance", "cabeceio", "cara", "contra", "meio", "defesa" };
+        static readonly string[] Types = { "penalti", "falta", "chance", "cabeceio", "corte", "cruzamento", "rebote", "cara", "contra", "meio", "defesa" };
         static int index, errors;
         static float stepAt;
         static int stage;
@@ -69,7 +69,7 @@ namespace Camisa10.EditorTools
             float t = Time.time - stepAt;
             switch (stage)
             {
-                case 0 when t > 1.6f && System.Array.IndexOf(new[] { "chance", "cara", "contra", "meio" }, Types[index]) >= 0 && !skillTried:
+                case 0 when t > 1.6f && System.Array.IndexOf(new[] { "chance", "cara", "contra", "meio", "cruzamento", "rebote" }, Types[index]) >= 0 && !skillTried:
                     // com a bola nos pés: tenta uma firula antes de chutar
                     skillTried = true;
                     hud.Skill.OnPress?.Invoke();
@@ -78,13 +78,13 @@ namespace Camisa10.EditorTools
                 case 0 when t > 1.6f:
                     // depois da apresentação: segura o chute (ou desarma, ou cabeceia na hora)
                     if (Types[index] == "defesa") hud.TackleL.OnPress?.Invoke();
-                    else if (Types[index] != "cabeceio") hud.Shoot.OnPress?.Invoke();
+                    else if (Types[index] != "cabeceio" && Types[index] != "corte") hud.Shoot.OnPress?.Invoke();
                     stage = 1; stepAt = Time.time; break;
-                case 1 when Types[index] == "cabeceio" && t > .1f:
+                case 1 when (Types[index] == "cabeceio" || Types[index] == "corte") && t > .1f:
                     hud.Shoot.OnPress?.Invoke(); // tenta cabecear quando a janela abrir
                     if (done || t > 3f) { stage = 2; stepAt = Time.time; }
                     break;
-                case 1 when Types[index] != "cabeceio" && t > .7f:
+                case 1 when Types[index] != "cabeceio" && Types[index] != "corte" && t > .7f:
                     hud.Shoot.OnRelease?.Invoke();
                     stage = 2; stepAt = Time.time; break;
                 case 2 when done || t > 8f:

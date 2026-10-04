@@ -111,6 +111,7 @@ static class Program
             switch (type)
             {
                 case "defesa": o = Rng.Chance(.5) ? LiveOutcome.TackleWon : LiveOutcome.Beaten; break;
+                case "corte": o = Rng.Chance(.6) ? LiveOutcome.Cleared : LiveOutcome.Beaten; break;
                 case "penalti": o = Rng.Chance(.72) ? LiveOutcome.Goal : Rng.Chance(.6) ? LiveOutcome.Saved : LiveOutcome.Missed; break;
                 default:
                     double x = Rng.Value;

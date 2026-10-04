@@ -46,6 +46,8 @@ namespace Camisa10.UI
         public Rigidbody Ball;
         /// <summary>Rede do gol do lance (estufa no gol).</summary>
         public GoalNet NearNet;
+        /// <summary>Torcida que reage (pode ser nula na qualidade leve).</summary>
+        public CrowdMotion Crowd;
         public bool Night { get; private set; }
 
         Light sceneLight;
@@ -537,8 +539,16 @@ namespace Camisa10.UI
 
         void BuildStands(StadiumStyle style)
         {
-            var home = new MeshBuilder(); var away = new MeshBuilder();
+            var home = new MeshBuilder(); var away = new MeshBuilder(); var seatsMb = new MeshBuilder();
             var concrete = new MeshBuilder(); var ribbon = new MeshBuilder();
+            // torcedores recortados: qualidade máxima nos dois anéis, equilibrada só no de baixo, leve fica com a torcida pintada
+            var q = GameSettings.Effective;
+            bool BillboardTier(Tier t) => q == GameSettings.Level.High || (q == GameSettings.Level.Medium && t.Offset == 0);
+            var crowdGo = new GameObject("Torcida");
+            crowdGo.transform.SetParent(Root, false);
+            var crowd = crowdGo.AddComponent<CrowdMotion>();
+            Crowd = crowd;
+            var fogC = RenderSettings.fogColor;
             var roofTop = new MeshBuilder(); var roofUnder = new MeshBuilder(); var lamps = new MeshBuilder(); var trusses = new MeshBuilder();
             var rnd = new System.Random(style.Seed);
             float tileW = StadiumArt.CrowdSeats * StadiumArt.SeatWidth;
@@ -561,6 +571,16 @@ namespace Camisa10.UI
                     {
                         float e = Mathf.Min(len + ext, s + tileW);
                         bool isAway = awaySection && t.Offset == 0 && s > len * .72f;
+                        if (BillboardTier(t))
+                        {
+                            // degrau com cadeiras; os torcedores ficam em pé por cima (abaixo)
+                            Vector3 sa = f0 + along * s + inward * t.Offset + Vector3.up * t.BaseY;
+                            Vector3 sb = f0 + along * e + inward * t.Offset + Vector3.up * t.BaseY;
+                            Vector3 sback = inward * t.D + Vector3.up * (t.TopY - t.BaseY);
+                            float us = s / 4.4f, ue = e / 4.4f;
+                            seatsMb.Quad(sa, sa + sback, sb + sback, sb, new Vector2(us, 0), new Vector2(us, t.Rows), new Vector2(ue, t.Rows), new Vector2(ue, 0));
+                            continue;
+                        }
                         var mb = isAway ? away : home;
                         float u0 = rnd.Next(StadiumArt.CrowdSeats) / (float)StadiumArt.CrowdSeats;
                         float uLen = (e - s) / tileW;
@@ -589,6 +609,42 @@ namespace Camisa10.UI
                         ribbon.Quad(p0 + lo, p0 + hi, p1 + hi, p1 + lo, new Vector2(0, v0), new Vector2(0, v1), new Vector2((e - s) / seg, v1), new Vector2((e - s) / seg, v0));
                     }
                     concrete.Quad(fa + Vector3.up * Lower.TopY, fa + Vector3.up * (Lower.TopY + .15f), fb + Vector3.up * (Lower.TopY + .15f), fb + Vector3.up * Lower.TopY);
+                }
+                // torcedores: anel de cima primeiro, e de trás para a frente (assim se sobrepõem certo)
+                foreach (var t in new[] { Upper, Lower })
+                {
+                    if (!BillboardTier(t)) continue;
+                    float ext = t.Offset;
+                    bool low = t.Offset == 0;
+                    for (int k = (int)t.Rows - 1; k >= 0; k--)
+                    {
+                        float shade = (low ? .95f : .8f) * (Night ? .85f : 1f) * (k > t.Rows - 3 && !low ? .85f : 1f);
+                        for (float s = -ext + .3f; s < len + ext - .3f; s += StadiumArt.SeatWidth)
+                        {
+                            if (rnd.NextDouble() < .07) continue; // cadeira vazia
+                            bool isAway = awaySection && low && s > len * .72f;
+                            bool standing = rnd.NextDouble() < (low && k < 5 ? .65 : .4);
+                            var seat = f0 + along * (s + (float)(rnd.NextDouble() - .5) * .12f) + inward * (t.Offset + (k + .45f) * t.Depth)
+                                + Vector3.up * (t.BaseY + k * t.Rise + (standing ? .78f : .38f));
+                            float br = shade * (.82f + (float)rnd.NextDouble() * .2f);
+                            var c = new Color(br, br, br, 1);
+                            float fog = Mathf.Clamp01((Vector3.Distance(seat, new Vector3(0, 1, -25)) - 60f) / 400f) * .6f;
+                            c = Color.Lerp(c, fogC, fog); c.a = 1;
+                            crowd.AddPerson(seat, along, 1.15f, isAway ? 1 : 0, c, low);
+                        }
+                    }
+                }
+                // bandeiras tremulando nas primeiras fileiras
+                if (BillboardTier(Lower))
+                {
+                    int nFlags = Mathf.RoundToInt(len / 18f);
+                    for (int i = 0; i < nFlags; i++)
+                    {
+                        float s = (i + .5f) / nFlags * len + (float)(rnd.NextDouble() - .5) * 6f;
+                        int k = 2 + rnd.Next(5);
+                        var corner = f0 + along * s + inward * (k * Lower.Depth) + Vector3.up * (Lower.BaseY + k * Lower.Rise + 1.5f);
+                        crowd.AddFlag(Root, corner, along, 1.7f, 1.1f, FlagMat(style, rnd.Next(3)), .25f);
+                    }
                 }
                 // passarela entre os anéis
                 Both(concrete, f0 + inward * Lower.D + Vector3.up * Lower.TopY, f0 + inward * Upper.Offset + Vector3.up * Lower.TopY,
@@ -648,6 +704,9 @@ namespace Camisa10.UI
             Corner(new Vector3(SX, 0, FZ), Vector3.back, Vector3.right);
 
             Build(home, "TorcidaCasa", Own(TexMat(StadiumArt.Crowd(style.Home1, style.Home2, style.Seed), Vector2.one, 0)), false);
+            if (seatsMb.Count > 0) Build(seatsMb, "Cadeiras", Own(TexMat(StadiumArt.Seats(style.Home1), Vector2.one, .1f)), false);
+            if (crowd.Count > 0) crowd.Finish(Own(Unlit(Color.white, StadiumArt.PeopleAtlas(style.Home1, style.Home2, style.Away1, style.Away2))));
+            else { Object.Destroy(crowdGo); Crowd = null; }
             Build(away, "TorcidaVisitante", Own(TexMat(StadiumArt.Crowd(style.Away1, style.Away2, style.Seed + 1), Vector2.one, 0)), false);
             Build(concrete, "Concreto", Mat(Theme.Hex(Night ? "#30343C" : "#5B6068"), .05f), false);
             if (ribbon.Count > 0) Build(ribbon, "AnelLED", ledMat ?? Mat(Color.Lerp(style.Home1, Color.black, .35f), .3f), false, false);
@@ -680,6 +739,33 @@ namespace Camisa10.UI
                 }
                 Build(halos, "HalosRefletores", halo, false, false);
             }
+        }
+
+        readonly Dictionary<int, Material> flagMats = new Dictionary<int, Material>();
+
+        /// <summary>Pano das bandeiras nas cores do time da casa (listras, faixa ou bandeirão com círculo).</summary>
+        Material FlagMat(StadiumStyle style, int kind)
+        {
+            if (flagMats.TryGetValue(kind, out var m)) return m;
+            const int W = 128, H = 80;
+            var t = Own(new Texture2D(W, H, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp });
+            var px = new Color[W * H];
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    float u = x / (float)W, v = y / (float)H;
+                    Color c;
+                    if (kind == 0) c = ((int)(u * 4) & 1) == 0 ? style.Home1 : style.Home2;                         // listras verticais
+                    else if (kind == 1) c = ((int)(v * 3) & 1) == 0 ? style.Home1 : style.Home2;                    // listras horizontais
+                    else if (kind == 2) c = Mathf.Abs(v - u * .62f - .2f) < .14f ? style.Home2 : style.Home1;        // faixa diagonal
+                    else { float d = new Vector2((u - .5f) * W / H, v - .5f).magnitude; c = d < .32f ? style.Home2 : d < .36f ? style.Home1 * .7f : style.Home1; }
+                    float fold = .88f + .12f * Mathf.Sin(u * 30f); // dobras do tecido
+                    px[y * W + x] = new Color(c.r * fold, c.g * fold, c.b * fold, 1);
+                }
+            t.SetPixels(px); t.Apply(true, true);
+            m = Own(Unlit(Night ? new Color(.85f, .85f, .85f) : Color.white, t));
+            flagMats[kind] = m;
+            return m;
         }
 
         // ---------- bola ----------

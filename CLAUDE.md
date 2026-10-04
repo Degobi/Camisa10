@@ -33,6 +33,12 @@ Não é gerenciador estilo Brasfoot: você controla um jogador, não um time.
   `Chance3D.AddPoints` (soma e mostra "+3 DRIBLE"); o resultado final do lance entra por `MatchEngine.OutcomePoints`.
 - Firulas em `Chance3D.Skills` (pedalada, elástico, chapéu, caneta; o joystick escolhe). Rede em `GoalNet` (linhas finas,
   estufa no gol). Bola com desenho real (icosaedro truncado) em `Arena.BallTexture` + malha própria `Arena.BallMesh`.
+- Tipos de lance (`Chance3D` + `Chance3D.Plays`): chance, cara, contra, meio, falta, pênalti, cabeceio, cruzamento, rebote,
+  corte (cabeceio defensivo) e defesa; posições sorteadas a cada lance; pesos por posição em `GameData.Positions[].Moments`.
+  Correr: botão CORRER (não solta se o dedo escorregar) ou joystick na borda; fôlego ~6 s.
+- Gol: `Chance3D.BallIntoNet` leva a bola até o fundo e a rede (`GoalNet.Hold/Release`) estica e balança; a física não decide.
+- Torcida: `CrowdMotion` (um recorte por assento, malha única, fileiras de trás para a frente; pula no gol via `Excite`).
+  Qualidade máxima = dois anéis, equilibrada = anel de baixo, leve = textura pintada.
 - Ligas: Brasileirão, La Liga, Premier League, Serie A, Ligue 1, Süper Lig, Saudi Pro League e MLS (`GameData.Leagues`,
   com copa, exigência de mercado e prestígio). Arábia e MLS só mandam proposta por convite/sondagem (evento ou fim de temporada).
 - Copa do Mundo (`Core/WorldCup.cs`): anos 2026, 2030...; convocado joga grupo + mata-mata no fim da temporada, partidas

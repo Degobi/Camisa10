@@ -160,6 +160,7 @@ namespace Camisa10.UI
             }
             AddPoints(label, pts);
             sfx?.Cheer(.4f);
+            A.Crowd?.Excite(.5f, 1.4f);
             hud.Banner(label + "!", Theme.FeedGold);
             StartCoroutine(HideBanner(.7f));
         }

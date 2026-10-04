@@ -355,6 +355,7 @@ namespace Camisa10.UI
             PassBtn = RoundButton(safe, "PASSE", Theme.Cyan, Theme.TurfInk, br, new Vector2(-480, 150), 150, 30);
             Dribble = RoundButton(safe, "DRIBLE", Theme.Gold, Theme.GoldInk, br, new Vector2(-450, 380), 150, 30);
             Sprint = RoundButton(safe, "CORRER", Theme.Purple, Color.white, br, new Vector2(-210, 480), 140, 28);
+            Sprint.Sticky = true;
             Skill = RoundButton(safe, "FIRULA", Theme.Hex("#FF7A1A"), Color.white, br, new Vector2(-690, 290), 150, 28);
             skillHint = UIKit.Txt(Skill.transform, "", 20, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
             skillHint.rectTransform.anchorMin = new Vector2(.5f, 0); skillHint.rectTransform.anchorMax = new Vector2(.5f, 0);

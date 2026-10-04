@@ -30,7 +30,7 @@ namespace Camisa10.UI
         {
             gk = new Goalkeeper(keeper, Mathf.Lerp(.3f, .8f, opp01));
             setPiece = type == "falta" || type == "penalti";
-            hud.Pad.AimMode = setPiece || type == "cabeceio";
+            hud.Pad.AimMode = setPiece || type == "cabeceio" || type == "corte";
             hud.Pad.OnAimDrag = AimDrag;
             hud.Shoot.OnPress = ShootPress;
             hud.Shoot.OnRelease = ShootRelease;
@@ -100,10 +100,10 @@ namespace Camisa10.UI
                 gk.Position(ball + new Vector3(bias * 6f, 0, 0), dt, type == "penalti" ? .15f : .7f);
                 hud.Reticle(true, ToHud(aimPoint), charging ? Theme.FeedGold : Color.white);
             }
-            else if (type == "cabeceio")
+            else if (type == "cabeceio" || type == "corte")
             {
-                gk.Position(headPoint, dt, .6f);
-                hud.Reticle(crossLaunched, ToHud(aimPoint));
+                if (type == "cabeceio") gk.Position(headPoint, dt, .6f);
+                hud.Reticle(crossLaunched && type == "cabeceio", ToHud(aimPoint));
                 if (crossLaunched && headArrive > 0)
                 {
                     float left = headArrive - Time.time;
@@ -126,6 +126,7 @@ namespace Camisa10.UI
         {
             if (!CanAct()) return;
             if (type == "cabeceio") { HeaderButton(); return; }
+            if (type == "corte") { CorteButton(); return; }
             if (type == "defesa") return;
             charging = true;
             chargeStart = Time.time;

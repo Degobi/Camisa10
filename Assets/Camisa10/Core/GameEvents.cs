@@ -159,6 +159,91 @@ namespace Camisa10.Core
             (g => g.NationalScore >= 72 && g.NationalScore < 80, .7, g => Ev("O técnico da Seleção ligou", "Ele diz que está de olho em você e pede mais regularidade para a próxima convocação.",
                 Opt("Fazer treinos extras", x => { var p = x.S.player; p.xp[(int)x.WeakestAttr()] += 10; p.energy -= 10; p.fame += 1; return "Você dobrou a carga. A comissão técnica vai notar."; }),
                 Opt("Manter a rotina", x => { x.S.player.moral += 3; return "Você seguiu tranquilo. A chance vai chegar."; }))),
+
+            // ---------- fama e mídia ----------
+            (g => g.S.player.fame >= 50, .45, g => {
+                long v = Game.R1000(150000 + g.S.player.fame * 4000);
+                return Ev("Capa do videogame", $"Uma produtora de jogos de futebol quer você na capa da próxima edição. Cachê de {Fmt.Money(v)}.",
+                    Opt("Aceitar", x => { var p = x.S.player; p.money += v; p.fame += 6; p.energy -= 6; return "Seu rosto vai estar em milhões de consoles. Que fase!"; }),
+                    Opt("Recusar: \"foco no campo\"", x => { x.S.player.coach += 3; return "O técnico gostou do foco."; })); }),
+
+            (g => g.S.player.fame >= 18, .5, g => Ev("Participação em clipe", "Um cantor de sucesso quer você no clipe da nova música. A gravação é na folga.",
+                Opt("Gravar", x => { var p = x.S.player; p.fame += 4; p.moral += 5; p.energy -= 8; return "O clipe bombou e você virou meme (do bom)."; }),
+                Opt("Ficar descansando", x => { x.S.player.energy += 6; return "Você recarregou as energias."; }))),
+
+            (g => g.S.player.fame >= 12, .5, g => Ev("Live com streamer", "Um streamer famoso te desafia para uma partida de videogame ao vivo.",
+                Opt("Topar o desafio", x => { var p = x.S.player;
+                    if (Rng.Chance(.5)) { p.fame += 4; p.moral += 4; return "Você venceu ao vivo. Recorde de audiência!"; }
+                    p.fame += 2; return "Perdeu feio, mas levou na esportiva e ganhou seguidores."; }),
+                Opt("Agora não", x => "Fica para outra vez."))),
+
+            // ---------- polêmicas ----------
+            (g => g.S.season.week >= 2, .45, g => Ev("Acusação de simulação", "O comitê disciplinar abriu processo: dizem que você simulou um pênalti no último jogo.",
+                Opt("Recorrer com advogado", x => { var p = x.S.player; long c = Game.R1000(Math.Max(10000, x.S.contract.salary * 2)); p.money -= c;
+                    if (Rng.Chance(.6)) return $"Absolvido! O advogado custou {Fmt.Money(c)}, mas valeu.";
+                    p.injury = Math.Max(p.injury, 1); return "Recurso negado: suspensão de 1 rodada."; }),
+                Opt("Aceitar a punição", x => { x.S.player.injury = Math.Max(x.S.player.injury, 1); x.S.player.fame -= 2; return "Suspenso por 1 rodada. Vida que segue."; }))),
+
+            (g => g.S.player.fame >= 20, .45, g => Ev("Fake news", "Um site publicou que você brigou com o técnico e pediu para sair. Nada disso aconteceu.",
+                Opt("Processar o site", x => { var p = x.S.player; p.coach += 4; p.fame += 1; return "O site se retratou. O técnico agradeceu o posicionamento."; }),
+                Opt("Gravar vídeo desmentindo", x => { var p = x.S.player; p.fame += 3; p.moral += 2; return "O vídeo viralizou e a mentira morreu."; }),
+                Opt("Ignorar", x => { x.S.player.coach -= 5; return "A dúvida ficou no ar no vestiário."; }))),
+
+            (g => g.S.player.fame >= 30, .4, g => Ev("Confusão no aeroporto", "Torcedores rivais cercaram você no desembarque, com xingamentos e empurrões.",
+                Opt("Contratar seguranças", x => { var p = x.S.player; p.money -= Game.R1000(Math.Max(8000, x.S.contract.salary)); p.moral += 2; return "Agora você anda com escolta. Mais tranquilidade."; }),
+                Opt("Responder aos gritos", x => { var p = x.S.player; p.fame += 2; p.coach -= 6; return "O vídeo correu as redes. O clube pediu calma."; }),
+                Opt("Sorrir e acenar", x => { var p = x.S.player; p.fame += 3; p.moral += 1; return "Classe. Até torcedores rivais elogiaram."; }))),
+
+            // ---------- vida pessoal ----------
+            (g => g.S.player.age >= 22 && g.S.player.moral >= 55, .3, g => Ev("Pedido de casamento", "Você está pensando em pedir sua namorada em casamento no gramado, depois do jogo.",
+                Opt("Pedir no gramado", x => { var p = x.S.player; p.moral += 15; p.fame += 4; p.energy -= 5; return "Ela disse SIM! O estádio inteiro aplaudiu."; }),
+                Opt("Pedir num jantar a dois", x => { x.S.player.moral += 12; return "Ela disse sim, num momento só de vocês."; }))),
+
+            (g => g.S.player.money >= 50000, .4, g => Ev("Irmão empresário", "Seu irmão quer largar o emprego para cuidar da sua carreira como empresário.",
+                Opt("Dar a chance", x => { var p = x.S.player;
+                    if (Rng.Chance(.5)) { p.fame += 3; p.moral += 6; x.S.interestLeague = null; return "Ele surpreendeu: fechou parcerias e a família ficou mais unida."; }
+                    p.money -= Game.R1000(p.money * .1); p.moral -= 4; return "Ele fez negócios ruins e você perdeu dinheiro. Clima tenso no Natal."; }),
+                Opt("Manter o empresário atual", x => { x.S.player.moral -= 3; return "Ele entendeu, mas ficou chateado."; }))),
+
+            (g => true, .4, g => Ev("Adoção", "Um abrigo de animais pede ajuda e um vira-lata te seguiu na saída do treino.",
+                Opt("Adotar o cachorro", x => { var p = x.S.player; p.moral += 7; p.fame += 2; return "O Gol (é o nome dele) já virou xodó da torcida."; }),
+                Opt("Fazer uma doação", x => { var p = x.S.player; p.money -= 5000; p.fame += 2; return "Sua doação reformou o abrigo."; }))),
+
+            (g => g.S.season.week >= 6 && g.S.player.form.Count > 0 && g.FormAvg >= 6.8f, .4, g => Ev("Tatuagem do escudo", "Você está pensando em tatuar o escudo do clube no braço.",
+                Opt("Tatuar", x => { var p = x.S.player; p.fame += 3; p.coach += 3; p.moral += 4; return "A torcida enlouqueceu. Você virou ídolo de vez."; }),
+                Opt("Melhor não", x => "Você preferiu não se comprometer."))),
+
+            // ---------- campo ----------
+            (g => g.S.season.week >= 3, .5, g => Ev("Improvisado", "Com desfalques, o técnico pergunta se você topa jogar improvisado em outra posição no próximo jogo.",
+                Opt("Topar pelo time", x => { var p = x.S.player; p.coach += 8; p.xp[(int)x.WeakestAttr()] += 8; return "O técnico não esquece quem topa o sacrifício."; }),
+                Opt("Pedir para jogar na sua posição", x => { x.S.player.coach -= 4; return "Ele aceitou, mas não gostou muito."; }))),
+
+            (g => g.S.season.week >= 2, .4, g => Ev("Dividida dura", "Numa dividida no último jogo, um adversário se machucou feio. A imprensa diz que você exagerou.",
+                Opt("Visitar ele no hospital", x => { var p = x.S.player; p.fame += 4; p.moral += 3; return "A visita emocionou o futebol. Fair play de verdade."; }),
+                Opt("Dizer que foi lance de jogo", x => { x.S.player.fame -= 2; return "Foi lance de jogo mesmo, mas pegou mal com parte do público."; }))),
+
+            (g => g.S.player.fame >= 15, .35, g => Ev("Despedida de um ídolo", "Uma lenda do futebol vai se despedir num jogo festivo e convidou você para o time dele.",
+                Opt("Jogar a despedida", x => { var p = x.S.player; p.fame += 4; p.moral += 6; p.energy -= 12; return "Você deu a assistência para o último gol da lenda. Momento histórico."; }),
+                Opt("Poupar o corpo", x => { x.S.player.energy += 5; return "Você mandou um vídeo de homenagem."; }))),
+
+            (g => g.S.activeSponsors.Count > 0 || g.S.player.fame >= 25, .4, g => {
+                var cores = Rng.Pick(new[] { ("#F2C230", "#111111"), ("#19E68C", "#0A0F1E"), ("#FF5468", "#FFFFFF"), ("#2BD9FE", "#111111"), ("#FFFFFF", "#D4AF37") });
+                return Ev("Chuteira exclusiva", "A marca de material esportivo quer lançar uma chuteira com o seu nome, numa cor exclusiva.",
+                    Opt("Aprovar o modelo", x => { var p = x.S.player; p.boot.c1 = cores.Item1; p.boot.c2 = cores.Item2; p.fame += 4; p.money += 30000;
+                        return "Sua chuteira exclusiva esgotou em um dia. Ela já está nos seus pés."; }),
+                    Opt("Manter a de sempre", x => "Você é fiel à chuteira de sempre.")); }),
+
+            (g => g.S.season.week >= 8 && g.S.player.energy < 45, .6, g => Ev("Cansaço acumulado", "O preparador físico mostra que você está no limite. Ele sugere um tratamento intensivo.",
+                Opt("Fazer o tratamento", x => { var p = x.S.player; p.energy += 25; p.money -= 8000; return "Câmara hiperbárica, crioterapia e sono. Novo em folha."; }),
+                Opt("Seguir no sacrifício", x => { var p = x.S.player;
+                    if (Rng.Chance(.35)) { p.injury = Rng.RangeInt(1, 3); return $"O corpo cobrou: lesão por fadiga, {p.injury} rodada(s) fora."; }
+                    return "Você aguentou. Por enquanto."; }))),
+
+            (g => g.S.career.Count >= 2, .35, g => {
+                var old = g.S.career[Rng.RangeInt(0, g.S.career.Count - 2)].club;
+                return Ev("Homenagem do ex-clube", $"O {old} vai fazer uma homenagem para você no próximo jogo deles.",
+                    Opt("Ir ao estádio receber", x => { var p = x.S.player; p.moral += 8; p.fame += 2; p.energy -= 5; return $"Aplaudido de pé no estádio do {old}. Arrepiou."; }),
+                    Opt("Mandar um vídeo", x => { x.S.player.moral += 3; return "Seu vídeo emocionou a antiga torcida."; })); }),
         };
 
         public static GameEvent Roll(Game g)

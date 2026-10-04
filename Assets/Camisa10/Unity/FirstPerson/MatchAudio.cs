@@ -45,7 +45,11 @@ namespace Camisa10.UI
         }
 
         public void Touch(float strength) => Play(Load("toque") ?? kick, .25f + strength * .35f, 1.15f + Random.Range(-.08f, .08f));
-        public void Kick(float strength) => Play(Load("chute") ?? kick, .55f + strength * .45f, .9f + Random.Range(-.05f, .05f));
+        public void Kick(float strength, bool head = false)
+        {
+            if (head) Play(Load("toque") ?? kick, .35f + strength * .3f, 1.3f + Random.Range(-.05f, .05f)); // cabeçada: batida mais seca
+            else Play(Load("chute") ?? kick, .55f + strength * .45f, .9f + Random.Range(-.05f, .05f));
+        }
         public void Whistle() => Play(Load("apito") ?? whistle, .5f, 1f);
 
         public void Cheer(float amount)

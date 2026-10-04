@@ -222,6 +222,12 @@ namespace Camisa10.EditorTools
             Shot("4-jogador", mate.position + new Vector3(1.6f, 1.4f, 2.2f), mate.position + Vector3.up * 1f);
             Shot("5-uniformes", new Vector3(0, 1.5f, -66.5f), new Vector3(0, 1.1f, -60));
             Shot("5b-uniformes-perto", new Vector3(-4, 1.4f, -62.6f), new Vector3(-4, 1.15f, -60));
+            // rede estufada com a bola lá dentro e torcida comemorando (aplica um quadro da animação na mão)
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            if (a.NearNet != null) { a.NearNet.Hold(new Vector3(1.2f, 1.1f, 2f), .5f); typeof(GoalNet).GetMethod("Update", flags).Invoke(a.NearNet, null); }
+            if (a.Crowd != null) { a.Crowd.Excite(1f, 10f); for (int i = 0; i < 40; i++) typeof(CrowdMotion).GetMethod("Update", flags).Invoke(a.Crowd, null); }
+            a.Ball.transform.position = new Vector3(1.2f, 1.1f, 2.3f);
+            Shot("8-gol-torcida", new Vector3(-4f, 1.7f, -9f), new Vector3(0, 1.8f, 4f));
             a.Ball.transform.position = new Vector3(-1.2f, Arena.BallRadius, -3.2f);
             Shot("7-rede-bola", new Vector3(-1.6f, .55f, -4.4f), new Vector3(.8f, 1.1f, 1.5f));
             a.Ball.transform.position = ball;

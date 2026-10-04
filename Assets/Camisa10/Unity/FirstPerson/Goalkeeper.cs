@@ -15,7 +15,9 @@ namespace Camisa10.UI
         readonly float skill; // 0 = time fraco, 1 = time de elite
 
         // mergulho
-        bool diving, down;
+        bool diving, down, rising;
+        float riseStart, downSide;
+        Vector3 posVel; // posicionamento suave (acelera e freia, sem deslizar)
         float diveStart, diveDur, side, rollMax, shiftMax, riseMax, reactAt;
         Vector3 origin;
         Vector3 aim; // ponto previsto (no plano do goleiro)
@@ -38,12 +40,20 @@ namespace Camisa10.UI
         public void Position(Vector3 ball, float dt, float depth = .8f)
         {
             if (diving || down) return;
+            if (rising)
+            {
+                // levantando do chão: gira de volta para de pé em ~0,6 s
+                float u = Mathf.Clamp01((Time.time - riseStart) / .6f);
+                T.rotation = Quaternion.LookRotation(Vector3.back) * Quaternion.Euler(0, 0, downSide * 85f * (1 - u * u));
+                if (u >= 1) { rising = false; rig?.Set(PersonRig.Mode.Ready); }
+                return;
+            }
             var toBall = new Vector3(ball.x, 0, ball.z);
             var dir = toBall.sqrMagnitude > .01f ? toBall.normalized : Vector3.back;
             var spot = dir * depth;            // sobre a linha que liga o centro do gol à bola
             spot.x = Mathf.Clamp(spot.x, -2.2f, 2.2f);
             spot.z = Mathf.Min(spot.z, -.3f);
-            T.position = Vector3.MoveTowards(T.position, spot, 2.2f * dt);
+            T.position = Vector3.SmoothDamp(T.position, spot, ref posVel, .28f, 4.5f, dt);
             var face = new Vector3(ball.x - T.position.x, 0, ball.z - T.position.z);
             if (face.sqrMagnitude > .01f) T.rotation = Quaternion.RotateTowards(T.rotation, Quaternion.LookRotation(face), 360f * dt);
             rig?.Set(PersonRig.Mode.Ready);
@@ -55,6 +65,9 @@ namespace Camisa10.UI
         /// </summary>
         public void OnShot(Vector3 ballPos, Vector3 ballVel, float curve, bool screened, int? guess = null, Vector3? truth = null)
         {
+            // caído ou levantando (rebote): reage bem mais tarde e alcança menos
+            bool late = down || rising;
+            if (late) { rising = false; T.rotation = Quaternion.LookRotation(Vector3.back); }
             diving = false; down = false;
             origin = T.position;
             float plane = origin.z;
@@ -79,7 +92,9 @@ namespace Camisa10.UI
                 else p = new Vector3(origin.x + guess.Value * R(1.8f, 2.8f), R(.3f, 1.6f), plane);
             }
             aim = new Vector3(p.x, Mathf.Clamp(p.y, 0, 2.6f), plane);
+            if (late) react += .32f;
             reactAt = Time.time + react;
+            if (rig != null) rig.Reach = aim; // os braços vão na direção de onde ele acha que a bola vai
 
             float dx = aim.x - origin.x;
             side = Mathf.Sign(dx); if (side == 0) side = 1;
@@ -90,7 +105,7 @@ namespace Camisa10.UI
             float lateral = Mathf.Max(0, adx - shiftMax), up = Mathf.Max(.2f, aim.y - riseMax);
             rollMax = Mathf.Clamp(Mathf.Atan2(lateral, up) * Mathf.Rad2Deg, 0, 92);
             // tempo para esticar: ~0,7 s até o canto (medido em goleiros profissionais), menos para bolas perto do corpo
-            diveDur = Mathf.Lerp(.7f, .65f, skill) * Mathf.Lerp(.55f, 1f, Mathf.Clamp01(adx / 3f));
+            diveDur = Mathf.Lerp(.7f, .65f, skill) * Mathf.Lerp(.55f, 1f, Mathf.Clamp01(adx / 3f)) * (late ? 1.25f : 1f);
         }
 
         /// <summary>Progresso do mergulho (0 a 1). Calibrado por simulação: goleiro médio defende ~50% do canto baixo com força a 18 m.</summary>
@@ -116,6 +131,23 @@ namespace Camisa10.UI
             var yaw = Quaternion.LookRotation(Vector3.back);
             T.rotation = yaw * Quaternion.Euler(0, 0, side * rollMax * e); // de frente para o campo, girando para o lado
             if (p >= 1f && Time.time - diveStart > diveDur + .25f) Land();
+        }
+
+        /// <summary>Começa o lance caído (rebote de uma defesa anterior).</summary>
+        public void SetDown(float side)
+        {
+            down = true; diving = false; rising = false; downSide = side;
+            var p = T.position; p.y = 0; T.position = p;
+            T.rotation = Quaternion.LookRotation(Vector3.back) * Quaternion.Euler(0, 0, side * 85f);
+            rig?.Set(PersonRig.Mode.Dive);
+        }
+
+        /// <summary>Levanta do chão (continua em Position).</summary>
+        public void GetUp()
+        {
+            if (!down) return;
+            down = false; rising = true; riseStart = Time.time;
+            rig?.Set(PersonRig.Mode.Stumble);
         }
 
         /// <summary>Termina o mergulho deitado no gramado.</summary>

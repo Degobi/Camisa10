@@ -101,6 +101,8 @@ namespace Camisa10.UI
 
         /// <summary>Para onde a cabeça olha (normalmente a bola).</summary>
         public Transform LookAt;
+        /// <summary>Goleiro: ponto (mundo) para onde os braços esticam no mergulho.</summary>
+        public Vector3? Reach;
         // velocidade medida pelo deslocamento real: escolhe andar/correr e a cadência sem o pé "patinar"
         Vector3 lastPos, moveVel, leanEuler;
         bool posInit;
@@ -217,7 +219,8 @@ namespace Camisa10.UI
 
             // parado, andando ou correndo conforme a velocidade, com folga para não ficar trocando
             bool locomote = mode == Mode.Idle || mode == Mode.Run || mode == Mode.Ready || mode == Mode.Stumble;
-            float s = locomote ? spd : 0;
+            // agachado (goleiro, marcador de frente) não troca para o ciclo de andar: dá passinhos curtos (abaixo)
+            float s = locomote && mode != Mode.Ready ? spd : 0;
             bool hasWalk = model.Clips.ContainsKey("walk");
             string want;
             if (clip == "run") want = s > 1.9f ? "run" : s > .3f && hasWalk ? "walk" : s > .3f ? "run" : "idle";
@@ -286,9 +289,23 @@ namespace Camisa10.UI
                 if (wArms > .001f)
                 {
                     var dir = (up + right * side * (mode == Mode.Celebrate ? .5f : .2f)).normalized;
+                    // no mergulho os braços esticam juntos na direção da bola
+                    if (mode == Mode.Dive && Reach.HasValue)
+                    {
+                        var to = Reach.Value - bones[arm].position;
+                        if (to.sqrMagnitude > .01f) dir = Vector3.Slerp(dir, to.normalized, .7f);
+                    }
                     Aim(arm, fore, dir, wArms);
                     Aim(fore, hand, dir, wArms);
                 }
+            }
+            // mergulho: pernas esticadas e quase juntas, no prolongamento do corpo
+            if (mode == Mode.Dive && wArms > .001f)
+            {
+                Aim(bLUp, bLLeg, (-up + right * .12f + fwd * .05f).normalized, wArms * .9f);
+                Aim(bRUp, bRLeg, (-up - right * .05f - fwd * .15f).normalized, wArms * .9f);
+                Aim(bLLeg, bLFoot, (-up + right * .1f).normalized, wArms * .8f);
+                Aim(bRLeg, bRFoot, (-up - fwd * .3f).normalized, wArms * .8f);
             }
 
             // saltos (barreira, comemoração)
@@ -300,6 +317,7 @@ namespace Camisa10.UI
                 if (j >= 1f) mode = Mode.Idle;
             }
             else if (mode == Mode.Celebrate) lift = Mathf.Abs(Mathf.Sin(modeTime * 10f)) * .12f;
+            else if (mode == Mode.Ready && spd > .25f) lift = Mathf.Abs(Mathf.Sin(modeTime * 13f)) * .045f * Mathf.Clamp01(spd / 2f); // passinhos laterais
             var mp = modelRoot.localPosition;
             mp.y = Mathf.Lerp(mp.y, lift, mode == Mode.Jump ? 1 : k);
             modelRoot.localPosition = mp;

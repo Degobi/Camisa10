@@ -159,6 +159,131 @@ namespace Camisa10.UI
             return tex;
         }
 
+        // ---------- torcedores recortados (um por assento, de pé ou sentado) ----------
+        public const int PeopleCols = 16, PeopleRows = 4; // linhas: casa, casa comemorando, visitante, visitante comemorando
+        static readonly Dictionary<string, Texture2D> peopleCache = new Dictionary<string, Texture2D>();
+
+        /// <summary>
+        /// Folha de torcedores com fundo transparente: 16 pessoas diferentes por linha; a linha de baixo de cada par é a
+        /// mesma pessoa com os braços para cima (o jogo troca quando a torcida comemora).
+        /// </summary>
+        public static Texture2D PeopleAtlas(Color home1, Color home2, Color away1, Color away2)
+        {
+            string key = ColorUtility.ToHtmlStringRGB(home1) + ColorUtility.ToHtmlStringRGB(home2) + ColorUtility.ToHtmlStringRGB(away1) + ColorUtility.ToHtmlStringRGB(away2);
+            if (peopleCache.TryGetValue(key, out var hit) && hit != null) return hit;
+            const int CW = 64, CH = 128, W = CW * PeopleCols, H = CH * PeopleRows;
+            var px = new Color32[W * H];
+            var rnd = new System.Random(key.GetHashCode());
+            float Rf() => (float)rnd.NextDouble();
+
+            void Put(int x, int y, Color c)
+            {
+                if (x < 0 || x >= W || y < 0 || y >= H) return;
+                px[y * W + x] = new Color(Mathf.Clamp01(c.r), Mathf.Clamp01(c.g), Mathf.Clamp01(c.b), 1);
+            }
+            void Ellipse(int cx, int cy, float rx, float ry, System.Func<float, float, Color> col)
+            {
+                for (int y = (int)(cy - ry - 1); y <= cy + ry + 1; y++)
+                    for (int x = (int)(cx - rx - 1); x <= cx + rx + 1; x++)
+                    {
+                        float dx = (x - cx) / rx, dy = (y - cy) / ry;
+                        if (dx * dx + dy * dy <= 1) Put(x, y, col(dx, dy));
+                    }
+            }
+            void Limb(int x0, int y0, int x1, int y1, float w, Color c)
+            {
+                int n = Mathf.Max(Mathf.Abs(x1 - x0), Mathf.Abs(y1 - y0)) + 1;
+                for (int i = 0; i <= n; i++)
+                {
+                    float t = i / (float)n;
+                    Ellipse((int)Mathf.Lerp(x0, x1, t), (int)Mathf.Lerp(y0, y1, t), w, w, (a, b2) => c * (1f - a * .15f));
+                }
+            }
+
+            for (int group = 0; group < 2; group++)
+            {
+                Color c1 = group == 0 ? home1 : away1, c2 = group == 0 ? home2 : away2;
+                for (int col = 0; col < PeopleCols; col++)
+                {
+                    // a mesma pessoa nas duas linhas (normal e comemorando)
+                    float pick = Rf();
+                    Color shirt = pick < .6f ? c1 : pick < .8f ? c2 : Casual[rnd.Next(Casual.Length)];
+                    Color skin = Skins[rnd.Next(Skins.Length)], hair = Hairs[rnd.Next(Hairs.Length)];
+                    bool cap = Rf() < .15f, scarf = Rf() < .25f, wide = Rf() < .3f;
+                    float shoulders = wide ? 21 : 17;
+                    for (int cheer = 0; cheer < 2; cheer++)
+                    {
+                        int ox = col * CW, oy = (group * 2 + cheer) * CH;
+                        int cx = ox + CW / 2;
+                        // tronco do assento para cima (as pernas ficam escondidas pela fileira da frente)
+                        for (int y = 0; y < 62; y++)
+                        {
+                            float t = y / 62f;
+                            float half = t > .82f ? shoulders * Mathf.Sqrt(Mathf.Max(0, 1 - (t - .82f) / .18f * .55f)) : shoulders - (1 - t) * 3;
+                            for (int x = -(int)half; x <= (int)half; x++)
+                            {
+                                float shade = .7f + t * .38f - Mathf.Abs(x) / half * .18f;
+                                Put(cx + x, oy + y, shirt * shade);
+                            }
+                        }
+                        if (scarf) for (int y = 52; y < 60; y++) for (int x = -12; x <= 12; x++) Put(cx + x, oy + y, ((x / 4) & 1) == 0 ? c1 : c2);
+                        // pescoço e cabeça
+                        Ellipse(cx, oy + 66, 5, 5, (a, b2) => skin * .85f);
+                        Ellipse(cx, oy + 80, 11, 13, (a, b2) => skin * (1.05f - Mathf.Abs(a) * .2f - b2 * .05f));
+                        if (cap) Ellipse(cx, oy + 87, 12, 7, (a, b2) => b2 > -.3f ? shirt * .9f : skin);
+                        else Ellipse(cx, oy + 87, 11.5f, 7, (a, b2) => b2 > -.1f ? hair : skin);
+                        // braços: ao lado do corpo ou levantados comemorando
+                        foreach (int sd in new[] { -1, 1 })
+                        {
+                            int sx = cx + sd * (int)(shoulders - 2), sy = oy + 54;
+                            if (cheer == 0)
+                            {
+                                Limb(sx, sy, sx + sd * 3, sy - 26, 4.2f, shirt * .85f);
+                                Limb(sx + sd * 3, sy - 26, sx + sd * 1, sy - 44, 3.6f, skin * .9f);
+                            }
+                            else
+                            {
+                                int ex = sx + sd * (8 + rnd.Next(5)), ey = sy + 26;
+                                Limb(sx, sy, ex, ey, 4.2f, shirt * .95f);
+                                Limb(ex, ey, ex + sd * rnd.Next(2, 6), ey + 26, 3.6f, skin);
+                                Ellipse(ex + sd * 4, ey + 30, 4.5f, 4.5f, (a, b2) => skin);
+                            }
+                        }
+                    }
+                }
+            }
+            var tex = new Texture2D(W, H, TextureFormat.RGBA32, true) { name = "Torcedores" };
+            tex.SetPixels32(px);
+            tex.hideFlags = HideFlags.DontUnloadUnusedAsset;
+            tex.wrapMode = TextureWrapMode.Clamp;
+            tex.filterMode = FilterMode.Trilinear;
+            tex.Apply(true, true);
+            peopleCache[key] = tex;
+            return tex;
+        }
+
+        static Texture2D seats;
+
+        /// <summary>Cadeiras vazias em fileiras (fica atrás dos torcedores recortados).</summary>
+        public static Texture2D Seats(Color club)
+        {
+            if (seats != null) return seats;
+            const int W = 256, H = 64; // 8 cadeiras x 1 fileira por ladrilho de 4,4 m
+            var px = new Color32[W * H];
+            var seat = Color.Lerp(club, new Color(.2f, .22f, .26f), .55f);
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    bool tread = y < 18;
+                    int sx = x % 32;
+                    bool chair = !tread && sx > 3 && sx < 29 && y < 52;
+                    Color c = tread ? new Color(.3f, .31f, .33f) * (.85f + y / 90f) : chair ? seat * (.75f + y / 200f) : new Color(.16f, .17f, .19f);
+                    px[y * W + x] = c;
+                }
+            seats = Finish(new Texture2D(W, H, TextureFormat.RGBA32, true), px, TextureWrapMode.Repeat);
+            return seats;
+        }
+
         // ---------- placas de publicidade ----------
         public sealed class Board { public string Text; public Color Bg, Fg; }
 

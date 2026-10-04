@@ -40,6 +40,8 @@ namespace Camisa10.UI
         /// <summary>Ao soltar o dedo (carregar a força do chute e soltar).</summary>
         public Action OnRelease;
         public bool Held;
+        /// <summary>Continua apertado mesmo se o dedo escorregar para fora (botão de correr).</summary>
+        public bool Sticky;
         Graphic g;
         Color baseColor;
 
@@ -53,7 +55,7 @@ namespace Camisa10.UI
         }
 
         public void OnPointerUp(PointerEventData e) => Release();
-        public void OnPointerExit(PointerEventData e) => Release();
+        public void OnPointerExit(PointerEventData e) { if (!Sticky) Release(); }
 
         void Release()
         {

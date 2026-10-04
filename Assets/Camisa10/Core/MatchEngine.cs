@@ -7,7 +7,7 @@ namespace Camisa10.Core
     public enum StepResult { Continue, AwaitChoice, Finished }
 
     /// <summary>Resultado de um lance jogado em primeira pessoa (cena 3D).</summary>
-    public enum LiveOutcome { Goal, Saved, Missed, Blocked, Assist, TeammateMissed, PassIntercepted, LostBall, TackleWon, Beaten, PenaltyWon }
+    public enum LiveOutcome { Goal, Saved, Missed, Blocked, Assist, TeammateMissed, PassIntercepted, LostBall, TackleWon, Beaten, PenaltyWon, Cleared }
 
     public class FeedLine { public string Text; public FeedKind Kind; }
 
@@ -77,6 +77,7 @@ namespace Camisa10.Core
                 case LiveOutcome.TackleWon: return ("Desarme", Pts.Tackle);
                 case LiveOutcome.Beaten: return ("Foi driblado", Pts.Beaten);
                 case LiveOutcome.PenaltyWon: return ("Pênalti sofrido", Pts.PenaltyWon);
+                case LiveOutcome.Cleared: return ("Corte de cabeça", Pts.Tackle);
                 default: return ("", 0);
             }
         }
@@ -263,6 +264,11 @@ namespace Camisa10.Core
                 case LiveOutcome.PassIntercepted: Add($"{m}' O passe não chega.", FeedKind.Me); break;
                 case LiveOutcome.LostBall: Add($"{m}' Você perde a bola.", FeedKind.Me); break;
                 case LiveOutcome.TackleWon: Add($"{m}' Desarme limpo!", FeedKind.Me); break;
+                case LiveOutcome.Cleared: Add($"{m}' Você sobe mais alto que todo mundo e tira de cabeça!", FeedKind.Me); break;
+                case LiveOutcome.Beaten when type == "corte":
+                    if (Rng.Chance(.4)) { Ga++; Add($"{m}' {GameData.Outfield(Opp.name)} ganha de você pelo alto e marca de cabeça. Gol do {Opp.name}.", FeedKind.OppGoal); }
+                    else Add($"{m}' O atacante cabeceia, mas a bola passa perto.", FeedKind.Me);
+                    break;
                 case LiveOutcome.Beaten:
                     if (Rng.Chance(.45)) { Ga++; Add($"{m}' {GameData.Outfield(Opp.name)} passa por você e marca. Gol do {Opp.name}.", FeedKind.OppGoal); }
                     else Add($"{m}' Ele passa por você, mas o goleiro salva.", FeedKind.Me);
@@ -302,6 +308,12 @@ namespace Camisa10.Core
                 new[] { O("Dar o bote", "tackle", .5, .02, (Attr.Def, .8f), (Attr.Fis, .2f)), O("Acompanhar e fechar o espaço", "contain", .6, .018, (Attr.Def, .5f), (Attr.Vel, .5f)), O("Fazer falta tática", "foul", .9, 0, (Attr.Fis, 1f)) }),
             ["cabeceio"] = (new[] { "Escanteio a favor. Você sobe para a área.", "Falta lateral levantada na área. Você ataca a bola." },
                 new[] { O("Cabecear para o gol", "goal", .2, .01, (Attr.Fis, .5f), (Attr.Fin, .5f)), O("Escorar para o meio", "assist", .3, .012, (Attr.Pas, 1f)) }),
+            ["corte"] = (new[] { "Escanteio contra. A bola vem na sua área.", "Cruzamento perigoso do adversário na sua área!", "Falta lateral levantada na área do seu time." },
+                new[] { O("Cortar de cabeça", "tackle", .55, .018, (Attr.Def, .5f), (Attr.Fis, .5f)), O("Afastar como der", "contain", .6, .015, (Attr.Fis, 1f)) }),
+            ["cruzamento"] = (new[] { "Você recebe aberto pela ponta, perto da linha de fundo.", "Bola lançada nas suas costas pelo lado do campo." },
+                new[] { O("Cruzar na área", "assist", .3, .012, (Attr.Pas, 1f)), O("Cortar para dentro e chutar", "goal", .16, .009, (Attr.Fin, .6f), (Attr.Dri, .4f)) }),
+            ["rebote"] = (new[] { "O goleiro espalma e a bola sobra para você na área!", "Rebote do goleiro, bola viva na pequena área!" },
+                new[] { O("Chutar de primeira", "goal", .42, .012, (Attr.Fin, 1f)), O("Rolar para o companheiro", "assist", .4, .01, (Attr.Pas, 1f)) }),
             ["penalti"] = (new[] { "Pênalti a seu favor! A bola é sua.", "O árbitro aponta a marca da cal. Você pega a bola." },
                 new[] { O("Bater no canto", "goal", .66, .006, (Attr.Fin, 1f)), O("Bater forte no meio", "goal", .6, .005, (Attr.Fis, .5f), (Attr.Fin, .5f)) }),
             ["cara"] = (new[] { "Você fica cara a cara com o goleiro!" },

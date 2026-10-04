@@ -14,7 +14,7 @@ namespace Camisa10.UI
         Vector3[] rest, cur, normalOut;
         float hitTime = -99, amp;
         Vector3 hitPoint;
-        bool settled = true;
+        bool settled = true, holding;
 
         const float Depth = 2.0f, BackTop = 2.15f, Step = .12f;
 
@@ -87,22 +87,47 @@ namespace Camisa10.UI
             amp = Mathf.Clamp(speed * .022f, .15f, .6f);
             hitTime = Time.time;
             settled = false;
+            holding = false;
+        }
+
+        /// <summary>A bola está empurrando a rede: estica em volta do ponto (mundo) com a profundidade dada.</summary>
+        public void Hold(Vector3 worldPoint, float depth)
+        {
+            hitPoint = transform.InverseTransformPoint(worldPoint);
+            amp = Mathf.Clamp(depth, 0, .8f);
+            holding = true;
+            settled = false;
+        }
+
+        /// <summary>A bola saiu da rede (caiu no chão): a rede volta balançando a partir de onde estava.</summary>
+        public void Release()
+        {
+            if (!holding) return;
+            holding = false;
+            hitTime = Time.time;
+        }
+
+        void Deform(float a, float radius2)
+        {
+            for (int i = 0; i < rest.Length; i++)
+            {
+                float d2 = (rest[i] - hitPoint).sqrMagnitude;
+                float w = Mathf.Exp(-d2 / radius2);
+                cur[i] = rest[i] + (normalOut[i] + (rest[i] - hitPoint).normalized * .25f) * (a * w);
+            }
+            mesh.vertices = cur;
         }
 
         void Update()
         {
             if (settled || mesh == null) return;
+            if (holding) { Deform(amp, .45f); return; }
             float t = Time.time - hitTime;
             // empurrão para fora que volta balançando (mola amortecida)
-            float a = amp * Mathf.Exp(-t * 3.2f) * Mathf.Cos(t * 11f) * Mathf.Clamp01(t / .06f);
-            for (int i = 0; i < rest.Length; i++)
-            {
-                float d2 = (rest[i] - hitPoint).sqrMagnitude;
-                float w = Mathf.Exp(-d2 / .55f);
-                cur[i] = rest[i] + (normalOut[i] + (rest[i] - hitPoint).normalized * .3f) * (a * w);
-            }
-            mesh.vertices = cur;
-            if (t > 2.2f) { settled = true; mesh.vertices = rest; }
+            // volta como mola amortecida e a ondulação se espalha pela rede
+            float a = amp * Mathf.Exp(-t * 2.6f) * Mathf.Cos(t * 10f);
+            Deform(a, .45f + t * .8f);
+            if (t > 2.6f) { settled = true; mesh.vertices = rest; }
         }
 
         void OnDestroy() { if (mesh != null) Destroy(mesh); }
