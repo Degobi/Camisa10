@@ -19,7 +19,9 @@ Não é gerenciador estilo Brasfoot: você controla um jogador, não um time.
   e o `Bootstrap.cs` sobe o jogo. Não crie dependência de objetos montados à mão no editor.
 - `Assets/Camisa10/Core/` é **C# puro**, sem `using UnityEngine`. Regras, economia e simulação ficam aqui.
 - 3D em `Assets/Camisa10/Unity/FirstPerson/`: `Arena` (estádio), `PersonRig` (jogador articulado com animação
-  procedural), `Chance3D` (lance em primeira pessoa), `SwipePad` (entrada), `ChanceHud` (HUD do lance).
+  procedural), `Chance3D` (lance em primeira pessoa), `SwipePad` e `TouchControls` (entrada), `ChanceHud` (HUD do lance), `MatchAudio` (sons gerados por código;
+  gravações reais em Resources/Sons substituem). Movimento em campo com aceleração e bote (`Chance3D.Steer`), e o
+  `PersonRig` escolhe parado/andando/correndo pela velocidade medida: mova o Transform, não force a animação.
 - Paisagem é garantida por `Landscape.cs` + `SafeArea.cs` (faixa 16:9 em telas mais altas que 4:3), pelo `CanvasScaler`
   (referência 1920x1080) e pela câmera do lance (`Arena.FitCamera` + `Arena.PitchBias`). Respeite isso em qualquer tela nova.
 - Telas fora de campo: monte linhas com `UIKit.Cols` e blocos com `UIKit.Tile` (ou `UIKit.Stack` para empilhar).
