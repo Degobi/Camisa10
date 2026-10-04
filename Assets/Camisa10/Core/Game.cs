@@ -13,7 +13,7 @@ namespace Camisa10.Core
         public GameState S;
         public long Counter; // contraproposta pendente na negociação (não é salva)
 
-        public Game(GameState state) { S = state; SyncClubs(); EnsureBusiness(); }
+        public Game(GameState state) { S = state; SyncClubs(); EnsureBusiness(); EnsureGlory(); }
 
         // ---------- utilidades ----------
         public static double Clamp(double v, double a, double b) => v < a ? a : v > b ? b : v;
@@ -140,6 +140,7 @@ namespace Camisa10.Core
             var se = new Season { year = S.year, league = lg, rounds = MakeFixtures(ids), topScorer = Rng.RangeInt(13, 22) };
             foreach (var id in ids) se.table.Add(new TableRow { club = id });
             S.season = se;
+            InitScorers();
             GenSponsorOffers();
         }
 
@@ -361,6 +362,7 @@ namespace Camisa10.Core
             p.fame -= .3f;
             p.money += S.contract.salary + S.contract.bonus * m.Goals + (long)Math.Round(SponsorWeekly);
             WeekBusiness();
+            GloryAfterRound(m);
             Normalize();
 
             string line = $"{m.My.name} {m.Gf} x {m.Ga} {m.Opp.name}";
@@ -415,11 +417,8 @@ namespace Camisa10.Core
             float avg = AvgRating;
             var sm = new SeasonSummary { rank = rank };
 
-            if (rank == 1) sm.titles.Add($"Campeão da {L.Name} {se.year}");
-            if (st.goals >= se.topScorer) sm.awards.Add($"Artilheiro da {L.Name} {se.year}");
-            if (avg >= 7.5 && st.apps >= 10) sm.awards.Add($"Craque da {L.Name} {se.year}");
-            if (p.age <= 21 && avg >= 7 && st.apps >= 10) sm.awards.Add($"Revelação da {L.Name} {se.year}");
-            if (Ovr >= 86 && avg >= 7.6 && p.fame >= 75) sm.awards.Add($"Prêmio Craque Mundial {se.year}");
+            if (rank == 1) sm.titles.Add($"Campeão {GameData.Of(L.Name)} {se.year}");
+            GloryEndSeason(sm, avg);
 
             foreach (var d in S.activeSponsors.ToList())
             {
@@ -434,6 +433,7 @@ namespace Camisa10.Core
                 assists = st.assists, avg = st.apps > 0 ? (float)Math.Round(avg, 1) : 0 });
             S.titles.AddRange(sm.titles);
             S.awards.AddRange(sm.awards);
+            CheckAchievements(null);
             p.fame += (float)((sm.titles.Count * 4 + sm.awards.Count * 3) * (1 - p.fame / 120.0));
             S.contract.years--;
             p.age++;

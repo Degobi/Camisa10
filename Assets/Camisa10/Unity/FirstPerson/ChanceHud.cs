@@ -10,6 +10,9 @@ namespace Camisa10.UI
         public SwipePad Pad;
         Text top, hint, banner, now;
         Image bannerBg;
+        RawImage view;
+
+        public void SetView(Texture t) { view.texture = t; view.enabled = t != null; }
 
         public static ChanceHud Build(Transform canvas)
         {
@@ -17,6 +20,12 @@ namespace Camisa10.UI
             var root = UIKit.Rect("ChanceHud", canvas);
             UIKit.Stretch(root);
             h.Root = root.gameObject;
+
+            // imagem do campo (a câmera do lance desenha nesta textura)
+            h.view = root.gameObject.AddComponent<RawImage>();
+            h.view.color = Color.white;
+            h.view.raycastTarget = false;
+            h.view.enabled = false;
 
             // área de toque em tela cheia (invisível)
             var padImg = UIKit.Img(root, new Color(0, 0, 0, 0), false, "SwipePad");

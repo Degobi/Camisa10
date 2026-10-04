@@ -352,9 +352,28 @@ namespace Camisa10.UI
             Prim(PrimitiveType.Cube, R, (a + b) / 2, new Vector3(.012f, .012f, d.magnitude), m, false, Quaternion.LookRotation(d));
         }
 
+        /// <summary>
+        /// Imagem do lance. A câmera desenha numa textura que a própria interface mostra (ChanceHud),
+        /// assim nenhum painel da interface consegue cobrir o campo.
+        /// </summary>
+        public RenderTexture View;
+        public System.Action<Texture> OnView;
+
+        void EnsureView()
+        {
+            int w = Mathf.Max(16, Screen.width), h = Mathf.Max(16, Screen.height);
+            if (View != null && View.width == w && View.height == h) return;
+            if (View != null) { Cam.targetTexture = null; View.Release(); Object.Destroy(View); }
+            View = new RenderTexture(w, h, 24) { name = "Lance3D", antiAliasing = Mathf.Clamp(QualitySettings.antiAliasing, 1, 8) };
+            View.Create();
+            Cam.targetTexture = View;
+            OnView?.Invoke(View);
+        }
+
         /// <summary>Ajusta o campo de visão e a área de desenho para a tela deitada.</summary>
         public void FitCamera()
         {
+            EnsureView();
             // paisagem: campo de visão horizontal amplo, como a câmera de um jogo de futebol
             Cam.rect = Landscape.Viewport01;
             float hFov = 80f * Mathf.Deg2Rad;
@@ -390,6 +409,8 @@ namespace Camisa10.UI
             RenderSettings.skybox = prevSky;
             RenderSettings.fog = prevFog; RenderSettings.fogColor = prevFogColor; RenderSettings.fogMode = prevFogMode;
             RenderSettings.fogStartDistance = prevFogStart; RenderSettings.fogEndDistance = prevFogEnd;
+            if (Cam != null) Cam.targetTexture = null;
+            if (View != null) { View.Release(); Object.Destroy(View); View = null; }
             if (Root != null) Object.Destroy(Root.gameObject);
         }
     }

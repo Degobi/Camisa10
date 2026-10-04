@@ -57,6 +57,10 @@ namespace Camisa10.Core
         public int actionsUsed; // ações da agenda gastas nesta rodada
         public List<string> doneActions = new List<string>();
         public SeasonSummary summary = new SeasonSummary();
+        public List<ScorerRow> scorers = new List<ScorerRow>(); // artilharia da liga (jogadores reais)
+        public List<CupTie> cup = new List<CupTie>();           // jogos da copa nesta temporada
+        public bool cupOut, cupWon;
+        public int cupGoals, monthMark;                         // gols na copa; início da janela do prêmio do mês
     }
 
     [Serializable]
@@ -82,6 +86,11 @@ namespace Camisa10.Core
     [Serializable] public class Holding { public string id; public int qty; public long cost; } // cost = total pago pelas ações em carteira
     [Serializable] public class Venture { public string id; public int level = 1; }
 
+    // ---------- glórias: artilharia, copa, seleção, prêmios e conquistas ----------
+    [Serializable] public class ScorerRow { public string name, club; public int goals; public float rate; }
+    [Serializable] public class CupTie { public int stage; public string opp, c1, c2; public int gf, ga, myGoals; public bool won, pens, home; }
+    [Serializable] public class RankRow { public string name, club; public float score; public bool me; }
+
     [Serializable] public class CareerRecord { public int year, rank, apps, goals, assists; public string club, c1, c2; public float avg; }
     [Serializable] public class News { public string when, text; }
 
@@ -103,5 +112,10 @@ namespace Camisa10.Core
         public List<Holding> holdings = new List<Holding>();
         public List<Venture> ventures = new List<Venture>();
         public long businessIncome; // lucro dos negócios na última rodada
+        public List<string> achievements = new List<string>(), monthly = new List<string>();
+        public int caps, intlGoals, cupGoalsTotal, bestBallon;
+        public bool calledUp;
+        public List<RankRow> ballon = new List<RankRow>(); // último ranking da Bola de Ouro
+        public int ballonYear;
     }
 }

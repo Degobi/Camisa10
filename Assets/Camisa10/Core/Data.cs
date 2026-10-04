@@ -111,6 +111,9 @@ namespace Camisa10.Core
             ["West Ham"] = new[] { "Areola", "Bowen", "Paquetá", "Füllkrug", "Soucek" },
         };
 
+        /// <summary>"do Brasileirão", "da La Liga", "da Premier League".</summary>
+        public static string Of(string league) => (league == "Brasileirão" ? "do " : "da ") + league;
+
         static readonly string[] NoSquad = { "o goleiro", "o camisa 9" };
         static string[] SquadOf(string club) => club != null && Squads.TryGetValue(club, out var s) ? s : NoSquad;
 

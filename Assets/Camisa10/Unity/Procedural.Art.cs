@@ -53,6 +53,15 @@ namespace Camisa10.UI
             return s;
         }
 
+        public static Sprite TrophySprite(bool gold)
+        {
+            string key = gold ? "trophy:gold" : "trophy:silver";
+            if (cache.TryGetValue(key, out var s)) return s;
+            s = ToSprite(TrophyArt.Render(gold, 160));
+            cache[key] = s;
+            return s;
+        }
+
         static Sprite bootSprite;
 
         public static Sprite BootSprite(BootStyle b)

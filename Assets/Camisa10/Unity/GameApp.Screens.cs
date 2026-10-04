@@ -261,6 +261,8 @@ namespace Camisa10.UI
                 UIKit.Label(col, item.when, Theme.Muted, 20);
                 UIKit.Txt(col, item.text, 24, Theme.Ink);
             }
+
+            HomeGlory();
         }
 
         void DoTrain()

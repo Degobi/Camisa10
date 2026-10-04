@@ -65,6 +65,7 @@ namespace Camisa10.UI.Art
             ["Tottenham"] = D("badge", "solid", "#FFFFFF", "#132257", "THFC", "#132257", .78f, .15f, "ball", "#132257"),
             ["Aston Villa"] = D("round", "solid", "#670E36", "#95BFE5", "AVFC", "#FBE122", .76f, .16f, "lion", "#FBE122"),
             ["Brighton"] = D("round", "solid", "#FFFFFF", "#0057B8", "BHAFC", "#0057B8", .74f, .14f, "bird", "#0057B8"),
+            ["Seleção"] = D("shield", "solid", "#FFDF00", "#009C3B", "BRA", "#002776", .56f, .26f, "star-top", "#009C3B"),
             ["West Ham"] = D("badge", "solid", "#7A263A", "#1BB1E7", "", emblem: "hammers", emblemCol: "#F2C230"),
         };
 
@@ -295,6 +296,53 @@ namespace Camisa10.UI.Art
             foreach (float dx in new[] { -w / 2 - 2, -w / 8, w / 8, w / 2 + 2 })
                 r.Fill(Shape.Ellipse(cx + dx, top + (Math.Abs(dx) > w / 4 ? 5 : 1), 2.2f, 2.2f), col);
             r.Fill(Shape.Ellipse(cx, top - 3, 3, 3), Rgba.Hex("#D7141A"));
+        }
+    }
+
+    /// <summary>Taça dourada (títulos) ou prateada (prêmios individuais) com brilho metálico.</summary>
+    public static class TrophyArt
+    {
+        public static Raster Render(bool gold, int w)
+        {
+            float scale = w / 100f;
+            var r = new Raster(w, (int)(120 * scale), scale);
+            var baseCol = Rgba.Hex(gold ? "#E2B33C" : "#C9D1DA");
+            Func<float, float, Rgba> metal = (x, y) =>
+            {
+                float band = (float)Math.Cos((x - 38) * .09f);
+                float k = .7f + .45f * band * band + .12f * (1 - y / 120f);
+                return baseCol.Mul(k);
+            };
+            var shadow = new Rgba(0, 0, 0, .35f);
+            // alças
+            foreach (int side in new[] { -1, 1 })
+            {
+                float cx = 50 + side * 30;
+                // anel: contorno externo + interno no mesmo polígono (o preenchimento par-ímpar deixa o furo)
+                var ring = Shape.Ellipse(cx, 36, 13, 16, 48);
+                var hole = Shape.Ellipse(cx, 36, 7.5f, 10.5f, 48);
+                ring.Pts.Add(ring.Pts[0]);
+                ring.Pts.AddRange(hole.Pts);
+                ring.Pts.Add(hole.Pts[0]);
+                r.Fill(ring.Moved(1, 1.5f), shadow);
+                r.Fill(ring, metal);
+            }
+            // copa
+            var bowl = Shape.M(20, 14).L(80, 14).C(80, 46, 68, 62, 56, 66).L(44, 66).C(32, 62, 20, 46, 20, 14);
+            r.Fill(bowl.Moved(1, 1.5f), shadow);
+            r.Fill(bowl, metal);
+            r.Fill(Shape.Ellipse(50, 14, 30, 4.5f, 64), (x, y) => baseCol.Mul(.55f));
+            // haste, nó e base
+            r.Fill(Shape.M(45, 66).L(55, 66).L(53, 84).L(47, 84), metal);
+            r.Fill(Shape.Ellipse(50, 84, 9, 3.5f, 32), metal);
+            var foot = Shape.M(34, 92).L(66, 92).L(70, 108).L(30, 108);
+            r.Fill(foot.Moved(1, 1.5f), shadow);
+            r.Fill(foot, (x, y) => Rgba.Hex("#3A2A1A").Mul(1.2f - (y - 92) / 30f));
+            r.Fill(Shape.Box(50, 99, 26, 3, 0), metal);
+            r.Fill(Shape.Box(50, 89, 30, 5, 0), metal);
+            // reflexo
+            r.Fill(Shape.M(30, 18).C(30, 36, 34, 48, 40, 56).L(36, 56).C(28, 46, 25, 34, 26, 18), new Rgba(1, 1, 1, .35f));
+            return r;
         }
     }
 }

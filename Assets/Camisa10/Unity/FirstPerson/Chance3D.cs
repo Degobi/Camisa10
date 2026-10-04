@@ -84,6 +84,10 @@ namespace Camisa10.UI
 
             var boards = new[] { m.My.c1, "#F2C230", m.Opp.c1, "#E53935", "#1E88E5", "#111111", m.My.c2 };
             A = Arena.Build(transform, boards);
+            A.OnView = t => hud.SetView(t);
+            hud.SetView(A.View);
+            Debug.Log($"[Camisa 10] Lance 3D: câmera {(A.Cam.enabled ? "ligada" : "desligada")}, imagem {A.View.width}x{A.View.height}, " +
+                $"{UnityEngine.Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None).Length} objetos visíveis na cena.");
 
             Color oppShirt = Theme.Hex(m.Opp.c1), oppShorts = Theme.Hex(m.Opp.c2);
             Color myShirt = Theme.Hex(m.My.c1), myShorts = Theme.Hex(m.My.c2);

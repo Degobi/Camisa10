@@ -44,10 +44,13 @@ namespace Camisa10.UI
         int negYears = 3;
         string negMsg = "";
 
+        /// <summary>Versão mostrada no topo: confirma que a Unity está rodando o código novo.</summary>
+        public const string Version = "0.8";
+
         // abas do menu principal (ordem da barra)
         static readonly (string id, string label)[] Tabs =
         {
-            ("home", "Central"), ("agenda", "Agenda"), ("player", "Jogador"), ("business", "Negócios"),
+            ("home", "Central"), ("agenda", "Agenda"), ("player", "Jogador"), ("trophies", "Troféus"), ("business", "Negócios"),
             ("contract", "Contrato"), ("sponsors", "Patrocínio"), ("life", "Vida"),
         };
 
@@ -211,6 +214,7 @@ namespace Camisa10.UI
                 {
                     case "agenda": BuildAgenda(); break;
                     case "player": BuildPlayer(); break;
+                    case "trophies": BuildTrophies(); break;
                     case "business": BuildBusiness(); break;
                     case "contract": BuildContract(); break;
                     case "sponsors": BuildSponsors(); break;
@@ -241,7 +245,7 @@ namespace Camisa10.UI
             UIKit.Crest(header, c, 62, 74);
             var col = UIKit.Column(header, 0);
             UIKit.LE(col, flexW: 1, minW: 0, prefW: 0);
-            var tag = UIKit.Label(col, $"Modo carreira · {c.name}", Theme.Turf, 22);
+            var tag = UIKit.Label(col, $"Modo carreira · {c.name} · v{Version}", Theme.Turf, 22);
             FitLine(tag, 16, 30);
             var name = UIKit.Txt(col, p.name, 40, Theme.Ink, FontStyle.Bold, TextAnchor.MiddleLeft);
             FitLine(name, 24, 50);
