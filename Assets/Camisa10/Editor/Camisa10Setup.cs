@@ -48,6 +48,7 @@ namespace Camisa10.EditorTools
             if (!BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.Android, BuildTarget.Android))
                 return "O módulo Android não está instalado. No Unity Hub: Installs > (sua versão) > Add modules > Android Build Support (com OpenJDK e Android SDK & NDK Tools).";
             ApplyCommon();
+            Camisa10BuildPrep.Prepare();
             PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
             EditorUserBuildSettings.buildAppBundle = false; // APK para instalar direto (AAB é só para a Play Store)

@@ -63,6 +63,9 @@ namespace Camisa10.UI
         {
             if (baseMat == null)
             {
+                // material em Resources (criado pelo editor) garante que o shader entre no build do celular
+                baseMat = Resources.Load<Material>("Materiais/Padrao");
+                if (baseMat != null) return baseMat;
                 var tmp = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 baseMat = tmp.GetComponent<Renderer>().sharedMaterial;
                 Object.DestroyImmediate(tmp);

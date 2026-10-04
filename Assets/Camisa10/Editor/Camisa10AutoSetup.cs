@@ -42,6 +42,7 @@ namespace Camisa10.EditorTools
 
             // o jogo é só em paisagem (celular deitado, nos dois sentidos)
             ApplyLandscape();
+            Camisa10BuildPrep.Prepare(); // evita tela rosa e componentes cortados no build
 
             if (!EditorPrefs.GetBool(GameViewFlag, false))
             {
