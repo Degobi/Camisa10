@@ -18,22 +18,35 @@ Não é gerenciador estilo Brasfoot: você controla um jogador, não um time.
 - **Toda a interface é criada por código** (`UIKit.cs`). Não há prefabs; a cena `Main.unity` fica vazia
   e o `Bootstrap.cs` sobe o jogo. Não crie dependência de objetos montados à mão no editor.
 - `Assets/Camisa10/Core/` é **C# puro**, sem `using UnityEngine`. Regras, economia e simulação ficam aqui.
-- 3D em `Assets/Camisa10/Unity/FirstPerson/`: `Arena` (estádio), `PersonRig` (jogador articulado com animação
-  procedural), `Chance3D` (lance em primeira pessoa), `SwipePad` (entrada), `ChanceHud` (HUD do lance).
+- 3D em `Assets/Camisa10/Unity/FirstPerson/`: `Arena` (estádio com dois anéis, cobertura, placas de LED, dia ou noite
+  via `StadiumStyle`), `StadiumArt` (texturas do estádio), `MeshBuilder` (junta peças repetidas numa malha só: no celular
+  cada objeto custa uma chamada de desenho), `PersonRig` (jogador), `Chance3D` (lance em primeira pessoa),
+  `SwipePad` (entrada), `ChanceHud` (HUD do lance, placar estilo TV e vinheta).
 - Paisagem é garantida por `Landscape.cs` + `SafeArea.cs` (faixa 16:9 em telas mais altas que 4:3), pelo `CanvasScaler`
   (referência 1920x1080) e pela câmera do lance (`Arena.FitCamera` + `Arena.PitchBias`). Respeite isso em qualquer tela nova.
 - Telas fora de campo: monte linhas com `UIKit.Cols` e blocos com `UIKit.Tile` (ou `UIKit.Stack` para empilhar).
   Cores só pelo `Theme` (paleta escura).
-- Use APIs da Unity 6: `Rigidbody.linearVelocity`, `linearDamping`, `FindFirstObjectByType`.
+- Use APIs da Unity 6.6: `Rigidbody.linearVelocity`, `linearDamping`, `FindAnyObjectByType`, `FindObjectsByType<T>()`
+  (as versões com `FindFirst`/`FindObjectsSortMode` estão obsoletas).
 - Entrada de toque só pelo EventSystem (interfaces `IPointer*`), para funcionar com qualquer Input System.
 - Clubes, ligas e jogadores são **reais** por decisão do dono (04/10/2026), com elencos em `GameData.Squads`
   (primeiro nome = goleiro). Marcas de patrocínio e empresas da bolsa seguem fictícias, exceto as SAFs de clubes.
   Não use o nome "FIFA". Publicar na loja com nomes reais exige licença: avise o dono antes de um build público.
 - Materiais 3D são criados a partir do material padrão de primitiva (`Arena.Mat`), para não sumir no build.
+  Coisas que brilham (LED, refletores, céu) usam `Arena.Unlit` (shader de sprites, sempre incluído), nunca `_EMISSION`.
+- **Arquivo real tem prioridade sobre o gerado por código** (o dono não quer arte desenhada por código):
+  `Resources/Estadio/grama` e `torcida`, `Resources/Sons/<nome>` (crowd, roar, ooh, kick, post, net, whistle...),
+  `Resources/Vida/<id do item>` (fotos da aba Vida), `Resources/Escudos`. O gerado só cobre a falta do arquivo.
+- Preferências do aparelho (qualidade gráfica, som, vibração) ficam em `GameSettings` (PlayerPrefs), fora do save.
+- Save (`SaveSystem`): gravação atômica com cópia `.bak`; `GameState` tem `profileId`, `rev` e datas para o futuro
+  modo online. Mudou o formato de forma incompatível? Suba `GameState.CurrentVersion` e migre em `Game.EnsureProfile`.
 
 ## Como validar mudanças
 1. Regras (Core): `cd Tools/Simulador && dotnet run -- 3` simula carreiras completas.
 2. Unity: com o MCP for Unity conectado, leia o Console, entre em Play e confira se não há erros vermelhos.
+   Sem o editor aberto, fotografe o lance (dia e noite), os menus e exporte os sons em `Capturas/`:
+   `Unity -batchmode -projectPath . -executeMethod Camisa10.EditorTools.Camisa10Preview.CaptureBatch -logFile -`
+   (no editor: menu **Camisa 10 > Capturar imagens do lance**).
 3. Builds: menu **Camisa 10 > Configurar build Android** (paisagem, IL2CPP, ARM64).
 
 ## Prioridades atuais (feedback do dono)

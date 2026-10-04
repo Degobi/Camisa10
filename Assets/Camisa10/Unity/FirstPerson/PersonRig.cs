@@ -295,11 +295,13 @@ namespace Camisa10.UI
         static Quaternion X(float a) => Quaternion.Euler(a, 0, 0);
         static Quaternion Z(float a) => Quaternion.Euler(0, 0, a);
 
-        void Update()
+        void Update() => Tick(Time.deltaTime);
+
+        /// <summary>Avança a animação; o editor usa direto para posar os jogadores nas capturas de tela.</summary>
+        public void Tick(float dt)
         {
-            if (model != null) { UpdateHuman(Time.deltaTime); return; }
+            if (model != null) { UpdateHuman(dt); return; }
             if (hips == null) return;
-            float dt = Time.deltaTime;
             if (mode != lastMode) { modeTime = 0; lastMode = mode; }
             modeTime += dt;
             float k = 1f - Mathf.Exp(-14f * dt); // suavização entre poses

@@ -8,7 +8,7 @@ namespace Camisa10.UI
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Init()
         {
-            if (Object.FindFirstObjectByType<GameApp>() != null) return;
+            if (Object.FindAnyObjectByType<GameApp>() != null) return;
             var go = new GameObject("Camisa10");
             go.AddComponent<GameApp>();
             Object.DontDestroyOnLoad(go);

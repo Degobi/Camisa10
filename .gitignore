@@ -16,3 +16,6 @@
 .vs/
 .idea/
 .DS_Store
+
+# capturas de tela geradas pelo editor
+/Capturas/

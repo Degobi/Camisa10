@@ -8,7 +8,8 @@ namespace Camisa10.UI
     {
         public GameObject Root;
         public SwipePad Pad;
-        Text top, hint, banner, now;
+        Text clock, homeName, awayName, score, hint, banner, now;
+        Image homeChip, awayChip;
         Image bannerBg;
         RawImage view;
 
@@ -27,6 +28,12 @@ namespace Camisa10.UI
             h.view.raycastTarget = false;
             h.view.enabled = false;
 
+            // vinheta por cima da imagem do campo (bordas mais escuras, como lente de transmissão)
+            var vig = UIKit.Img(root, Color.white, false, "Vinheta");
+            vig.sprite = Procedural.VignetteSprite();
+            UIKit.Stretch(vig.rectTransform);
+            vig.raycastTarget = false;
+
             // área de toque em tela cheia (invisível)
             var padImg = UIKit.Img(root, new Color(0, 0, 0, 0), false, "SwipePad");
             UIKit.Stretch(padImg.rectTransform);
@@ -36,13 +43,30 @@ namespace Camisa10.UI
             UIKit.Stretch(safe);
             safe.gameObject.AddComponent<SafeArea>();
 
-            var topBg = UIKit.Img(safe, new Color(.04f, .12f, .07f, .78f), true, "Top");
-            var trt = topBg.rectTransform;
-            trt.anchorMin = new Vector2(0, 1); trt.anchorMax = new Vector2(1, 1); trt.pivot = new Vector2(.5f, 1);
-            trt.anchoredPosition = new Vector2(0, -24); trt.sizeDelta = new Vector2(-48, 110);
-            topBg.raycastTarget = false;
-            h.top = UIKit.Txt(topBg.transform, "", 44, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
-            UIKit.Stretch(h.top.rectTransform);
+            // placar no canto, no estilo das transmissões de TV
+            var bug = UIKit.Rect("Placar", safe);
+            bug.anchorMin = bug.anchorMax = new Vector2(0, 1); bug.pivot = new Vector2(0, 1);
+            bug.anchoredPosition = new Vector2(36, -30);
+            var bl = UIKit.H(bug.gameObject, 0);
+            bl.childForceExpandHeight = true;
+            bug.gameObject.AddComponent<ContentSizeFitter>().horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            bug.sizeDelta = new Vector2(0, 66);
+            Text Cell(Color bg, int minW, int size, Color fg, out Image img)
+            {
+                img = UIKit.Img(bug, bg, false, "Cel");
+                img.raycastTarget = false;
+                UIKit.LE(img, prefW: minW, minW: minW);
+                var t = UIKit.Txt(img.transform, "", size, fg, FontStyle.Bold, TextAnchor.MiddleCenter);
+                UIKit.Stretch(t.rectTransform);
+                return t;
+            }
+            h.clock = Cell(Theme.Hex("#0B0F1A"), 104, 36, Theme.Turf, out _);
+            h.homeChip = UIKit.Img(bug, Color.white, false, "CorCasa"); UIKit.LE(h.homeChip, prefW: 10, minW: 10); h.homeChip.raycastTarget = false;
+            h.homeName = Cell(Theme.Alpha(Theme.Hex("#141B2D"), .94f), 116, 36, Color.white, out _);
+            h.score = Cell(Color.white, 120, 40, Theme.Hex("#0B0F1A"), out _);
+            h.awayName = Cell(Theme.Alpha(Theme.Hex("#141B2D"), .94f), 116, 36, Color.white, out _);
+            h.awayChip = UIKit.Img(bug, Color.white, false, "CorFora"); UIKit.LE(h.awayChip, prefW: 10, minW: 10); h.awayChip.raycastTarget = false;
+            UIKit.Depth(h.clock.transform.parent.GetComponent<Image>(), 4, .4f);
 
             var hintBg = UIKit.Img(safe, new Color(.04f, .12f, .07f, .72f), true, "Hint");
             var hrt = hintBg.rectTransform;
@@ -74,7 +98,25 @@ namespace Camisa10.UI
             return h;
         }
 
-        public void SetTop(string s) => top.text = s;
+        /// <summary>Atualiza o placar (mandante sempre à esquerda, como na TV).</summary>
+        public void SetScore(int minute, string home, Color homeColor, int homeGoals, int awayGoals, string away, Color awayColor)
+        {
+            clock.text = minute + "'";
+            homeName.text = Abbrev(home); awayName.text = Abbrev(away);
+            homeChip.color = homeColor; awayChip.color = awayColor;
+            score.text = $"{homeGoals} - {awayGoals}";
+        }
+
+        /// <summary>Sigla de três letras do clube ("São Paulo" → "SAO").</summary>
+        public static string Abbrev(string name)
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (char ch in (name ?? "").Normalize(System.Text.NormalizationForm.FormD))
+                if (char.IsLetter(ch) && System.Globalization.CharUnicodeInfo.GetUnicodeCategory(ch) != System.Globalization.UnicodeCategory.NonSpacingMark)
+                    sb.Append(char.ToUpperInvariant(ch));
+            var s = sb.ToString();
+            return s.Length > 3 ? s.Substring(0, 3) : s;
+        }
         public void SetHint(string s) => hint.text = s;
         public void ShowNow(bool on) { if (now.gameObject.activeSelf != on) now.gameObject.SetActive(on); }
 

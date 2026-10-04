@@ -97,7 +97,12 @@ namespace Camisa10.Core
     [Serializable]
     public class GameState
     {
-        public int version = 1, year;
+        public const int CurrentVersion = 2;
+        public int version = CurrentVersion, year;
+        // identidade e controle de versão do save: base para sincronizar com um servidor no modo online
+        public string profileId;          // id único e permanente desta carreira
+        public long createdUtc, savedUtc; // DateTime.UtcNow.Ticks
+        public int rev;                   // sobe a cada salvamento; o servidor usa para detectar conflito entre aparelhos
         public bool retired;
         public Player player = new Player();
         public List<Club> clubs = new List<Club>();

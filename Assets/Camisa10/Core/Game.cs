@@ -13,7 +13,15 @@ namespace Camisa10.Core
         public GameState S;
         public long Counter; // contraproposta pendente na negociação (não é salva)
 
-        public Game(GameState state) { S = state; SyncClubs(); EnsureBusiness(); EnsureGlory(); }
+        public Game(GameState state) { S = state; EnsureProfile(); SyncClubs(); EnsureBusiness(); EnsureGlory(); }
+
+        /// <summary>Saves antigos não tinham identidade: gera uma e marca a versão atual do formato.</summary>
+        void EnsureProfile()
+        {
+            if (string.IsNullOrEmpty(S.profileId)) S.profileId = Guid.NewGuid().ToString("N");
+            if (S.createdUtc == 0) S.createdUtc = DateTime.UtcNow.Ticks;
+            if (S.version < GameState.CurrentVersion) S.version = GameState.CurrentVersion;
+        }
 
         // ---------- utilidades ----------
         public static double Clamp(double v, double a, double b) => v < a ? a : v > b ? b : v;

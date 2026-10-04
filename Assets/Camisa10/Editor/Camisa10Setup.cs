@@ -34,8 +34,7 @@ namespace Camisa10.EditorTools
         [MenuItem("Camisa 10/Apagar carreira salva")]
         public static void DeleteSave()
         {
-            string path = System.IO.Path.Combine(Application.persistentDataPath, "camisa10.json");
-            if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
+            Camisa10.UI.SaveSystem.Delete(); // apaga também a cópia de segurança
             EditorUtility.DisplayDialog("Camisa 10", "Carreira salva apagada. O próximo Play começa do zero.", "OK");
         }
 

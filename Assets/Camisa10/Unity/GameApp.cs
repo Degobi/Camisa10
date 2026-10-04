@@ -45,18 +45,21 @@ namespace Camisa10.UI
         string negMsg = "";
 
         /// <summary>Versão mostrada no topo: confirma que a Unity está rodando o código novo.</summary>
-        public const string Version = "0.9";
+        public const string Version = "0.10";
 
         // abas do menu principal (ordem da barra)
         static readonly (string id, string label)[] Tabs =
         {
             ("home", "Central"), ("agenda", "Agenda"), ("player", "Jogador"), ("trophies", "Troféus"), ("business", "Negócios"),
-            ("contract", "Contrato"), ("sponsors", "Patrocínio"), ("life", "Vida"),
+            ("contract", "Contrato"), ("sponsors", "Patrocínio"), ("life", "Vida"), ("settings", "Ajustes"),
         };
 
         void Awake()
         {
             Application.targetFrameRate = 60;
+            Screen.sleepTimeout = SleepTimeout.NeverSleep; // a tela não apaga no meio do lance
+            GameSettings.Apply();
+            Sfx.Ensure(gameObject);
             Landscape.LockOrientation();
             EnsureCamera();
             EnsureEventSystem();
@@ -90,7 +93,7 @@ namespace Camisa10.UI
 
         static void EnsureEventSystem()
         {
-            if (FindFirstObjectByType<EventSystem>() != null) return;
+            if (FindAnyObjectByType<EventSystem>() != null) return;
             var go = new GameObject("EventSystem");
             go.AddComponent<EventSystem>();
             // Projetos novos da Unity 6 usam o Input System; projetos antigos usam o módulo clássico.
@@ -219,6 +222,7 @@ namespace Camisa10.UI
                     case "contract": BuildContract(); break;
                     case "sponsors": BuildSponsors(); break;
                     case "life": BuildLife(); break;
+                    case "settings": BuildSettings(); break;
                     default: BuildHome(); break;
                 }
             }
@@ -258,7 +262,7 @@ namespace Camisa10.UI
             FitLine(l2, 20, 46);
 
             var ovrBox = UIKit.Img(header, Theme.Gold, true, "Ovr");
-            UIKit.LE(ovrBox, 84, 84, prefW: 96, minW: 96);
+            UIKit.LE(ovrBox, 84, 84, flexW: 0, prefW: 96, minW: 96); // flexW 0: o layout interno não pode esticar o quadro
             UIKit.V(ovrBox.gameObject, 4, -6, TextAnchor.MiddleCenter);
             UIKit.Txt(ovrBox.transform, game.Ovr.ToString(), 44, Theme.GoldInk, FontStyle.Bold, TextAnchor.MiddleCenter);
             UIKit.Txt(ovrBox.transform, p.pos, 18, Theme.GoldInk, FontStyle.Bold, TextAnchor.MiddleCenter);

@@ -85,12 +85,11 @@ namespace Camisa10.UI
             type = m.Current.Type;
             opp01 = Mathf.Clamp01((m.Opp.str - 50) / 40f);
 
-            var boards = new[] { m.My.c1, "#F2C230", m.Opp.c1, "#E53935", "#1E88E5", "#111111", m.My.c2 };
-            A = Arena.Build(transform, boards);
+            A = Arena.Build(transform, Style(g, m));
             A.OnView = t => hud.SetView(t);
             hud.SetView(A.View);
             Debug.Log($"[Camisa 10] Lance 3D: câmera {(A.Cam.enabled ? "ligada" : "desligada")}, imagem {A.View.width}x{A.View.height}, " +
-                $"{UnityEngine.Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None).Length} objetos visíveis na cena.");
+                $"{UnityEngine.Object.FindObjectsByType<Renderer>().Length} objetos visíveis na cena.");
 
             Color oppShirt = Theme.Hex(m.Opp.c1), oppShorts = Theme.Hex(m.Opp.c2);
             Color myShirt = Theme.Hex(m.My.c1), myShorts = Theme.Hex(m.My.c2);
@@ -101,7 +100,8 @@ namespace Camisa10.UI
             kSpeed = Mathf.Lerp(3.2f, 4.6f, opp01);
             kMax = Mathf.Lerp(2.1f, 2.7f, opp01);
 
-            hud.SetTop($"{m.Minute}'   {m.My.name} {m.Gf} x {m.Ga} {m.Opp.name}");
+            if (m.Home) hud.SetScore(m.Minute, m.My.name, Theme.Hex(m.My.c1), m.Gf, m.Ga, m.Opp.name, Theme.Hex(m.Opp.c1));
+            else hud.SetScore(m.Minute, m.Opp.name, Theme.Hex(m.Opp.c1), m.Ga, m.Gf, m.My.name, Theme.Hex(m.My.c1));
             string hint;
             switch (type)
             {
@@ -215,9 +215,31 @@ namespace Camisa10.UI
 
             // apresentação do lance antes de liberar o controle
             introUntil = Time.time + 1.4f;
+            Sfx.Crowd(true, A.Night ? .5f : .42f);
+            if (type == "falta") Sfx.Play(Sfx.Kind.Whistle, .5f);
             hud.Intro($"{m.Minute}'  {m.Current.Text}");
             startTime = introUntil;
             prevBall = A.Ball.transform.position;
+        }
+
+        /// <summary>
+        /// Estádio do mandante: torcida com as cores dele, um canto com a torcida visitante, placas com as marcas do jogo
+        /// (os patrocinadores do jogador aparecem primeiro) e jogo à noite em parte das rodadas.
+        /// </summary>
+        static StadiumStyle Style(Game g, MatchEngine m)
+        {
+            var home = m.Home ? m.My : m.Opp; var away = m.Home ? m.Opp : m.My;
+            var se = g.S.season;
+            var brands = new List<string>();
+            foreach (var d in g.S.activeSponsors) if (!brands.Contains(d.brand)) brands.Add(d.brand);
+            return new StadiumStyle
+            {
+                Home1 = Theme.Hex(home.c1), Home2 = Theme.Hex(home.c2),
+                Away1 = Theme.Hex(away.c1), Away2 = Theme.Hex(away.c2),
+                Night = (se.year * 31 + se.week * 7) % 5 < 2,
+                Seed = Mathf.Abs((home.id ?? home.name ?? "").GetHashCode()) % 1000,
+                Boards = StadiumStyle.DefaultBoards(brands),
+            };
         }
 
         // ---------- utilidades ----------
@@ -318,6 +340,7 @@ namespace Camisa10.UI
             kickT = 0;
             foreach (var bl in blockers) if (wallJump) Rig(bl).Set(PersonRig.Mode.Jump);
             Launch(start, target, speed);
+            Sfx.Play(Sfx.Kind.Kick, .55f + power01 * .45f, (type == "cabeceio" ? 1.35f : 1.08f) - power01 * .16f);
             shotTime = Time.time;
             phase = Phase.Flight;
             hud.SetHint("");
@@ -338,6 +361,7 @@ namespace Camisa10.UI
             hud.HideControls();
             kickT = 0;
             Launch(start, target, speed);
+            Sfx.Play(Sfx.Kind.Kick, .45f + power01 * .3f, 1.15f);
             shotTime = Time.time;
             phase = Phase.Flight;
             hud.SetHint("");
@@ -431,6 +455,7 @@ namespace Camisa10.UI
             }
         }
 
+        bool swelled;
         Vector3 footAnchor;
         bool footAnchored;
 
@@ -524,9 +549,10 @@ namespace Camisa10.UI
             }
             hud.DribbleReady(nearest < 3.2f);
 
-            // o goleiro sai do gol quando você entra na área
+            // o goleiro sai do gol quando você entra na área (e a torcida levanta)
             if (b.z > -16f)
             {
+                if (!swelled) { swelled = true; Sfx.Swell(.25f, 2.5f); }
                 keeper.position = Vector3.MoveTowards(keeper.position, new Vector3(b.x * .5f, 0, Mathf.Max(b.z + 2.2f, -5f)), (2.6f + opp01 * 1.2f) * dt);
                 Face(keeper, b);
                 keeperZ = keeper.position.z;
@@ -672,6 +698,7 @@ namespace Camisa10.UI
             curveAccel = 0;
             mateShotFlight = true;
             Launch(A.Ball.transform.position, target, 22f);
+            Sfx.Play(Sfx.Kind.Kick, .6f);
             shotTime = Time.time;
             phase = Phase.Flight;
         }
@@ -715,6 +742,7 @@ namespace Camisa10.UI
         {
             var v = A.Ball.linearVelocity;
             A.Ball.linearVelocity = new Vector3(v.x * .4f + R(-3, 3), Mathf.Abs(v.y) * .5f + 1.5f, v.z * zFactor);
+            Sfx.Play(Sfx.Kind.Kick, .6f, .8f);
         }
 
         void CheckCrossings()
@@ -769,12 +797,37 @@ namespace Camisa10.UI
             hud.ShowNow(false);
             hud.SetHint("");
             hud.Banner(customText ?? Label(o), Good(o) ? Theme.FeedGold : Color.white);
+            Reaction(o);
             if (o == LiveOutcome.Goal || o == LiveOutcome.Assist)
             {
                 if (mate != null) Rig(mate).Set(PersonRig.Mode.Celebrate);
                 StartCoroutine(Shake(.35f, .06f));
             }
             StartCoroutine(End(o));
+        }
+
+        /// <summary>Resposta da torcida (e vibração no gol).</summary>
+        static void Reaction(LiveOutcome o)
+        {
+            switch (o)
+            {
+                case LiveOutcome.Goal:
+                case LiveOutcome.Assist:
+                    Sfx.Play(Sfx.Kind.Net, .8f);
+                    Sfx.Play(Sfx.Kind.Roar);
+                    GameSettings.Buzz();
+                    break;
+                case LiveOutcome.Saved:
+                case LiveOutcome.Missed:
+                case LiveOutcome.TeammateMissed:
+                    Sfx.Play(Sfx.Kind.Ooh); break;
+                case LiveOutcome.Blocked:
+                    Sfx.Play(Sfx.Kind.Ooh, .6f); break;
+                case LiveOutcome.TackleWon:
+                    Sfx.Play(Sfx.Kind.Applause, .8f); break;
+                default:
+                    Sfx.Play(Sfx.Kind.Groan, .7f); break;
+            }
         }
 
         static bool Good(LiveOutcome o) => o == LiveOutcome.Goal || o == LiveOutcome.Assist || o == LiveOutcome.TackleWon;
@@ -817,6 +870,7 @@ namespace Camisa10.UI
 
         void OnDestroy()
         {
+            Sfx.Crowd(false);
             if (A != null) A.Destroy();
             A = null;
         }

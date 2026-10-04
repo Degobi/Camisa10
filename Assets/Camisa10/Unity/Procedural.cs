@@ -121,6 +121,29 @@ namespace Camisa10.UI
             return s;
         }
 
+        /// <summary>Vinheta: preto transparente no centro escurecendo nas bordas (lente de câmera de TV).</summary>
+        public static Sprite VignetteSprite()
+        {
+            if (cache.TryGetValue("vignette", out var s)) return s;
+            const int w = 256, h = 144;
+            var tex = NewTex(w, h);
+            var px = new Color32[w * h];
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    float u = (x + .5f) / w * 2 - 1, v = (y + .5f) / h * 2 - 1;
+                    float d = Mathf.Sqrt(u * u * .8f + v * v);
+                    float a = Mathf.SmoothStep(0, 1, Mathf.InverseLerp(.62f, 1.35f, d)) * .62f;
+                    a += Mathf.SmoothStep(0, 1, Mathf.InverseLerp(.55f, 1f, v)) * .12f; // céu um pouco mais escuro, como num filtro de lente
+                    px[y * w + x] = new Color32(0, 0, 0, (byte)(Mathf.Clamp01(a) * 255));
+                }
+            tex.SetPixels32(px);
+            tex.Apply();
+            s = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(.5f, .5f), 100);
+            cache["vignette"] = s;
+            return s;
+        }
+
         /// <summary>Faixa listrada da figurinha com as cores do clube.</summary>
         public static Sprite StripesSprite(string c1, string c2)
         {

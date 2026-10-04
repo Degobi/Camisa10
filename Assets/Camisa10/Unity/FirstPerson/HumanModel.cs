@@ -97,7 +97,7 @@ namespace Camisa10.UI
                     };
                 }
 
-                var mesh = new Mesh { name = "Jogador" };
+                var mesh = new Mesh { name = "Jogador", hideFlags = HideFlags.DontUnloadUnusedAsset }; // fica em cache
                 mesh.vertices = pos;
                 mesh.normals = nrm;
                 mesh.boneWeights = bw;

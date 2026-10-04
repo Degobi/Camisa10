@@ -62,6 +62,20 @@ namespace Camisa10.UI
             return s;
         }
 
+        /// <summary>
+        /// Foto de um item de estilo de vida (Resources/Vida/&lt;id&gt;.png ou .jpg, ex.: carro1). Nulo se não houver:
+        /// o dono prefere fotos reais a ilustrações desenhadas por código.
+        /// </summary>
+        public static Sprite LifestyleSprite(string itemId)
+        {
+            string key = "life:" + itemId;
+            if (cache.TryGetValue(key, out var s)) return s;
+            var tex = Resources.Load<Texture2D>("Vida/" + itemId);
+            s = tex != null ? Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(.5f, .5f), 100) : null;
+            cache[key] = s;
+            return s;
+        }
+
         static Sprite bootSprite;
 
         public static Sprite BootSprite(BootStyle b)

@@ -812,26 +812,56 @@ namespace Camisa10.UI
 
             var right = UIKit.Stack(cols, 1.2f);
             var l = UIKit.Tile(right, "Estilo de vida", Theme.Purple);
-            UIKit.Muted(l, "Compras aumentam sua moral e sua fama.");
+            UIKit.Muted(l, "Garagem, casa e acessórios. Cada compra aumenta sua moral e sua fama.");
+            // vitrine em cards de 3 colunas, com ilustração
+            RectTransform line = null;
+            int count = 0;
             foreach (var it in GameData.Items)
             {
+                if (count++ % 3 == 0) line = UIKit.Cols(l, 16);
                 bool own = game.S.owned.Contains(it.Id);
-                var sc = SubCard(l, 16, 4);
-                var r = UIKit.Row(sc, 14);
-                var col = UIKit.Column(r, 2);
-                UIKit.LE(col, flexW: 1, minW: 0, prefW: 0);
-                UIKit.Txt(col, it.Name, 28, Theme.Ink, FontStyle.Bold);
-                UIKit.Muted(col, $"{it.Cat} · {Fmt.Money(it.Price)} · fama +{it.Fame}, moral +{it.Moral}", 22);
+                var card = SubCard(line, 0, 0);
+                UIKit.LE(card, flexW: 1, prefW: 0, minW: 0);
+                // foto real se existir em Resources/Vida; senão, faixa com a categoria
+                var photo = Procedural.LifestyleSprite(it.Id);
+                var pic = UIKit.Img(card, photo != null ? Color.white : LifeColor(it.Cat), photo == null, "Foto");
+                if (photo != null) { pic.sprite = photo; pic.preserveAspect = true; }
+                else
+                {
+                    var cat = UIKit.Txt(pic.transform, it.Cat.ToUpperInvariant(), 44, Theme.Alpha(Color.white, .9f), FontStyle.BoldAndItalic, TextAnchor.MiddleCenter);
+                    UIKit.Stretch(cat.rectTransform);
+                }
+                UIKit.LE(pic, photo != null ? 170 : 92, photo != null ? 170 : 92);
+                if (own)
+                {
+                    var tag = UIKit.Tag(pic.transform, "Seu", Theme.Turf, Theme.TurfInk);
+                    tag.anchorMin = tag.anchorMax = tag.pivot = new Vector2(0, 1);
+                    tag.anchoredPosition = new Vector2(12, -12);
+                    tag.gameObject.AddComponent<ContentSizeFitter>().horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+                    tag.GetComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+                }
+                var info = UIKit.Column(card, 4);
+                info.GetComponent<VerticalLayoutGroup>().padding = new RectOffset(16, 16, 10, 16);
+                var name = UIKit.Txt(info, it.Name, 26, Theme.Ink, FontStyle.Bold);
+                name.resizeTextForBestFit = true; name.resizeTextMinSize = 18; name.resizeTextMaxSize = 26;
+                UIKit.LE(name, 32, 32);
+                UIKit.Txt(info, Fmt.Money(it.Price), 26, Theme.Gold, FontStyle.Bold);
+                UIKit.Muted(info, $"{it.Cat} · fama +{it.Fame} · moral +{it.Moral}", 20);
                 string id = it.Id;
-                var b = own ? UIKit.Btn(r, "Comprado", Theme.Card, Theme.Turf, null, 60, 24) : UIKit.Primary(r, "Comprar", () => Commit(game.Buy(id)));
-                UIKit.LE(b, 60, 60, prefW: 220, minW: 180);
+                var b = own ? UIKit.Btn(info, "Na garagem", Theme.Card, Theme.Turf, null, 56, 22) : UIKit.Primary(info, "Comprar", () => Commit(game.Buy(id)));
+                if (own && it.Cat == "Casa") b.GetComponentInChildren<Text>().text = "SUA CASA";
+                if (own && it.Cat == "Estilo") b.GetComponentInChildren<Text>().text = "NO PULSO";
+                UIKit.LE(b, 56, 56);
                 b.interactable = !own && p.money >= it.Price;
             }
+            // completa a última linha para os cards não esticarem
+            for (; count % 3 != 0; count++) UIKit.LE(UIKit.Rect("Vazio", line), flexW: 1, prefW: 0, minW: 0);
 
-            UIKit.Ghost(right, "Recomeçar do zero", () => ShowModal("Recomeçar do zero?",
-                "Sua carreira atual será apagada e não poderá ser recuperada.",
-                ("Apagar e recomeçar", (Action)ResetCareer, true), ("Cancelar", (Action)CloseModal, false)));
+            UIKit.Ghost(right, "Ajustes e recomeçar carreira", () => { tab = "settings"; Render(true); });
         }
+
+        static Color LifeColor(string cat) => cat == "Carro" ? Color.Lerp(Theme.Red, Theme.Card, .35f)
+            : cat == "Casa" ? Color.Lerp(Theme.Cyan, Theme.Card, .45f) : Color.Lerp(Theme.Gold, Theme.Card, .4f);
 
         void ResetCareer()
         {
