@@ -776,8 +776,8 @@ namespace Camisa10.UI
             ball.GetComponent<MeshFilter>().sharedMesh = BallMesh(); // UV em latitude/longitude exatas para o desenho da bola
             Ball = ball.AddComponent<Rigidbody>();
             Ball.mass = .43f;
-            Ball.linearDamping = .05f;
-            Ball.angularDamping = .3f;
+            Ball.linearDamping = 0f;   // o arrasto do ar é calculado em BallPhysics (com o efeito)
+            Ball.angularDamping = .15f;
             Ball.interpolation = RigidbodyInterpolation.Interpolate;
             Ball.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
             Ball.isKinematic = true;

@@ -153,6 +153,10 @@ namespace Camisa10.UI
                 M(HumanModel.Part.Socks, Arena.Mat(socks, .1f));
             }
             M(HumanModel.Part.Skin, skin);
+            M(HumanModel.Part.Eyes, Arena.Mat(new Color(.13f, .08f, .05f), .9f)); // íris escura com brilho
+            M(HumanModel.Part.Sclera, Arena.Mat(new Color(.92f, .9f, .86f), .7f));
+            // antebraço: pele, ou manga comprida no goleiro
+            M(HumanModel.Part.Forearms, keeper ? (mats[(int)HumanModel.Part.Shirt] ?? skin) : skin);
             M(HumanModel.Part.Boots, Arena.Mat(boots, .55f));
             M(HumanModel.Part.Hands, keeper ? Arena.Mat(Theme.Hex("#F5F5F5"), .2f) : skin);
             M(HumanModel.Part.Hair, Arena.Mat(Hairs[Rng.RangeInt(0, Hairs.Length - 1)], .35f));

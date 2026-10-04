@@ -78,6 +78,7 @@ namespace Camisa10.EditorTools
                 case 0 when t > 1.6f:
                     // depois da apresentação: segura o chute (ou desarma, ou cabeceia na hora)
                     if (Types[index] == "defesa") hud.TackleL.OnPress?.Invoke();
+                    else if (Types[index] == "chance" || Types[index] == "cara") hud.Finesse.OnPress?.Invoke(); // chute colocado
                     else if (Types[index] != "cabeceio" && Types[index] != "corte") hud.Shoot.OnPress?.Invoke();
                     stage = 1; stepAt = Time.time; break;
                 case 1 when (Types[index] == "cabeceio" || Types[index] == "corte") && t > .1f:

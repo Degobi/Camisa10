@@ -33,6 +33,16 @@ Não é gerenciador estilo Brasfoot: você controla um jogador, não um time.
   `Chance3D.AddPoints` (soma e mostra "+3 DRIBLE"); o resultado final do lance entra por `MatchEngine.OutcomePoints`.
 - Firulas em `Chance3D.Skills` (pedalada, elástico, chapéu, caneta; o joystick escolhe). Rede em `GoalNet` (linhas finas,
   estufa no gol). Bola com desenho real (icosaedro truncado) em `Arena.BallTexture` + malha própria `Arena.BallMesh`.
+- Jogadores modelados em código (`ProceduralBody`): campo de distâncias com anatomia, rosto, cabelo, mãos, chuteiras e
+  uniforme com volume (camisa/calção mais largos, bainhas retas), extraído por surface nets e preso ao esqueleto do
+  `jogador.bytes` (de lá vêm só ossos e animações). O editor salva a malha em `Resources/Modelos/corpo.bytes`
+  (`Camisa10BuildPrep.BakeBody`); mudou a modelagem? suba `ProceduralBody.ModelVersion` que ele regera.
+  Olhos e sobrancelhas são peças à parte em alta resolução (a grade de 1,1 cm é grossa demais para eles).
+- Bola (`BallPhysics`): arrasto do ar + efeito Magnus; `Chance3D.Launch(alvo, velocidade, giro)` resolve a trajetória
+  para terminar no alvo. Chute forte (giro por cima), COLOCADO (efeito lateral, mais preciso), falta com efeito escolhido.
+- Goleiro (`Goalkeeper`): mergulho pelo quadril (o corpo voa de lado, não tomba pelos pés), passo extra quando sobra tempo;
+  números calibrados por simulação (médio: canto baixo ~43% de gol, ângulo ~57%, colocado ~47%, pênalti certo ~45%).
+- Sem pé/perna de primeira pessoa na tela (a câmera é o olho do jogador).
 - Tipos de lance (`Chance3D` + `Chance3D.Plays`): chance, cara, contra, meio, falta, pênalti, cabeceio, cruzamento, rebote,
   corte (cabeceio defensivo) e defesa; posições sorteadas a cada lance; pesos por posição em `GameData.Positions[].Moments`.
   Correr: botão CORRER (não solta se o dedo escorregar) ou joystick na borda; fôlego ~6 s.

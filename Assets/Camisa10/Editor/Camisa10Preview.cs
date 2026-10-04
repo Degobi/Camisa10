@@ -221,6 +221,7 @@ namespace Camisa10.EditorTools
             Shot("3-estadio", new Vector3(14, 1.7f, -30), new Vector3(-10, 4f, 0));
             Shot("4-jogador", mate.position + new Vector3(1.6f, 1.4f, 2.2f), mate.position + Vector3.up * 1f);
             Shot("5-uniformes", new Vector3(0, 1.5f, -66.5f), new Vector3(0, 1.1f, -60));
+            Shot("9-rosto", new Vector3(-5.05f, 1.68f, -59.35f), new Vector3(-5f, 1.66f, -60f));
             Shot("5b-uniformes-perto", new Vector3(-4, 1.4f, -62.6f), new Vector3(-4, 1.15f, -60));
             // rede estufada com a bola lá dentro e torcida comemorando (aplica um quadro da animação na mão)
             var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;

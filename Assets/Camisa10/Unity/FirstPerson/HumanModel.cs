@@ -13,7 +13,7 @@ namespace Camisa10.UI
     /// </summary>
     public sealed class HumanModel
     {
-        public enum Part { Shirt, Skin, Shorts, Socks, Boots, Hands, Hair }
+        public enum Part { Shirt, Skin, Shorts, Socks, Boots, Hands, Hair, Eyes, Forearms, Sclera }
 
         public sealed class Clip
         {
@@ -45,6 +45,17 @@ namespace Camisa10.UI
             if (ta == null) return null;
             try { cached = Parse(ta.bytes); }
             catch (Exception e) { Debug.LogWarning("[Camisa 10] Não foi possível ler o modelo do jogador: " + e.Message); }
+            // o corpo é modelado em código (anatomia, rosto, uniforme com volume); do arquivo ficam o esqueleto e as animações
+            if (cached != null)
+            {
+                try
+                {
+                    // pré-gerado no editor (rápido); sem o arquivo, gera agora (alguns segundos)
+                    var body = ProceduralBody.Load(cached) ?? ProceduralBody.Build(cached, out _);
+                    if (body != null) cached.Mesh = body;
+                }
+                catch (Exception e) { Debug.LogWarning("[Camisa 10] Corpo procedural falhou, usando o modelo do arquivo: " + e); }
+            }
             return cached;
         }
 

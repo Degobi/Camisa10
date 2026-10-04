@@ -59,6 +59,7 @@ namespace Camisa10.UI
         Vector3 me, ballVel, camVel, camLook;
         bool camInit;
         float lastTouch = -9, touchAt = -9, stepPhase, fovBoost;
+        Vector3 ballSpin; // giro atual da bola (rad/s), usado no efeito Magnus
 
         /// <summary>Estado de movimento de quem corre em campo: velocidade com aceleração, reação atrasada e bote.</summary>
         sealed class Mover
@@ -319,7 +320,7 @@ namespace Camisa10.UI
             SetupShooting();
             if (keeperDown > 0) StartCoroutine(KeeperDownFor(keeperDown)); // depois do goleiro existir
             foreach (var bl in blockers) Rig(bl).Set(wallJump ? PersonRig.Mode.Idle : PersonRig.Mode.Ready);
-            if (type != "defesa" && type != "cabeceio" && type != "corte") CreateFoot();
+            // sem pé de primeira pessoa: em jogo de futebol a câmera é os olhos do jogador (nada flutuando na tela)
 
             foreach (var r in A.Root.GetComponentsInChildren<PersonRig>()) r.LookAt = A.Ball.transform;
             me = Flat(A.Ball.transform.position) - Vector3.forward * .45f;
@@ -479,15 +480,23 @@ namespace Camisa10.UI
             A.PlaceCamera(ball + new Vector3(0, 1.6f, -2.4f), new Vector3(0, .9f, 0));
         }
 
-        void Launch(Vector3 start, Vector3 target, float speed)
+        /// <summary>
+        /// Lança a bola com física real (arrasto + giro) para passar pelo alvo. spin em rad/s: y = efeito lateral
+        /// (positivo curva para +x), x = efeito por cima (positivo faz a bola cair). Devolve o tempo até o alvo.
+        /// </summary>
+        float Launch(Vector3 start, Vector3 target, float speed, Vector3 spin = default)
         {
-            float T = Mathf.Max(.25f, HorizDist(start, target) / Mathf.Max(1f, speed));
-            var v = new Vector3((target.x - start.x) / T, (target.y - start.y) / T + .5f * Gravity * T, (target.z - start.z) / T);
+            var v = BallPhysics.Solve(start, target, speed, spin, out float time);
             A.Ball.isKinematic = false;
             A.Ball.position = start;
+            A.Ball.transform.position = start;
             A.Ball.linearVelocity = v;
-            A.Ball.angularVelocity = new Vector3(R(-10, 10), -curveAccel * 3f, 0);
-            prevBall = A.Ball.transform.position;
+            A.Ball.maxAngularVelocity = 120f;
+            A.Ball.angularVelocity = spin + new Vector3(R(-2, 2), 0, R(-2, 2));
+            ballSpin = spin;
+            curveAccel = BallPhysics.LateralAccel(spin, speed);
+            prevBall = start;
+            return time;
         }
 
         Vector3 GoalTarget(Ray ray)
@@ -525,13 +534,14 @@ namespace Camisa10.UI
             target.x += (float)Rng.Gauss() * sigma;
             target.y += (float)Rng.Gauss() * sigma * .7f;
             float speed = Mathf.Lerp(13f, 21f + Stat(Attr.Fis) * .12f, power01) * powerScale;
-            curveAccel = Mathf.Clamp(bend / (Mathf.Min(Screen.width, Screen.height) * .12f), -1f, 1f) * (3f + Stat(Attr.Dri) * .05f);
+            float bendAccel = Mathf.Clamp(bend / (Mathf.Min(Screen.width, Screen.height) * .12f), -1f, 1f) * (3f + Stat(Attr.Dri) * .05f);
             carry = false;
             hud.HideControls();
             kickT = 0;
             sfx?.Kick(.6f + power01 * .4f);
             foreach (var bl in blockers) if (wallJump) Rig(bl).Set(PersonRig.Mode.Jump);
-            Launch(start, target, speed);
+            // curva do traço vira efeito lateral; força alta dá um pouco de efeito por cima
+            Launch(start, target, speed, new Vector3(power01 * 6f, bendAccel / (BallPhysics.Magnus * Mathf.Max(8f, speed) * .8f), 0));
             shotTime = Time.time;
             phase = Phase.Flight;
             hud.SetHint("");
@@ -693,10 +703,14 @@ namespace Camisa10.UI
             if (phase == Phase.Aim) PlaceFoot();
         }
 
+        /// <summary>Arrasto do ar e efeito Magnus enquanto a bola está solta (o mesmo modelo usado para mirar).</summary>
         void FixedUpdate()
         {
-            if (A == null || phase != Phase.Flight || passFlight || curveAccel == 0) return;
-            if (A.Ball.transform.position.y > .15f) A.Ball.AddForce(new Vector3(curveAccel, 0, 0), ForceMode.Acceleration);
+            if (A == null || A.Ball.isKinematic) return;
+            var v = A.Ball.linearVelocity;
+            if (v.sqrMagnitude < .04f) return;
+            A.Ball.AddForce(BallPhysics.ExtraAccel(v, ballSpin, A.Ball.position.y), ForceMode.Acceleration);
+            ballSpin *= .996f; // o giro diminui aos poucos
         }
 
         void FollowBall(float dt)
@@ -994,8 +1008,10 @@ namespace Camisa10.UI
                 crossLaunched = true;
                 const float T = 1.15f;
                 var start = A.Ball.transform.position;
-                Launch(start, headPoint, HorizDist(start, headPoint) / T);
-                float arrive = Time.time + T;
+                // cruzamento com efeito leve fechando na área
+                float side = start.x > 0 ? 1 : -1;
+                float tt = Launch(start, headPoint, HorizDist(start, headPoint) / T, new Vector3(0, side * R(6, 14), 0));
+                float arrive = Time.time + tt;
                 windowOpen = arrive - .3f - Stat(Attr.Fis) * .002f;
                 windowClose = arrive + .12f;
                 headArrive = arrive;
@@ -1082,6 +1098,7 @@ namespace Camisa10.UI
         {
             var v = A.Ball.linearVelocity;
             A.Ball.linearVelocity = new Vector3(v.x * .4f + R(-3, 3), Mathf.Abs(v.y) * .5f + 1.5f, v.z * zFactor);
+            ballSpin = new Vector3(R(-15, 15), R(-15, 15), 0);
             sfx?.Touch(.8f);
         }
 

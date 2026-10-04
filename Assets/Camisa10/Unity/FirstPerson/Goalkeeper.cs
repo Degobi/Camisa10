@@ -24,7 +24,6 @@ namespace Camisa10.UI
         public bool Committed => diving;
         public float LineZ => T.position.z;
 
-        const float Reach = 2.25f;   // dos pés às mãos com os braços esticados
         const float BodyR = .3f;     // "grossura" do corpo e das luvas
 
         public Goalkeeper(Transform t, float skill01)
@@ -59,9 +58,17 @@ namespace Camisa10.UI
             rig?.Set(PersonRig.Mode.Ready);
         }
 
+        // mergulho pelo quadril: o quadril voa de lado num arco e o corpo gira em torno dele (não "tomba" pelos pés)
+        const float HipH = .95f;
+        Vector3 originHip;
+        float hipShift, hipEndY, extMax, landStart;
+        Quaternion landFrom;
+
         /// <summary>
         /// Chamado no chute. curve = aceleração lateral do efeito; screened = a bola passou pela barreira/defensores
         /// (ele vê tarde); guess = pênalti: o goleiro escolhe o canto antes (-1, 0 ou 1) e sai junto com a batida.
+        /// Calibrado por simulação (goleiro médio): canto baixo forte a 18 m ~43% de gol, ângulo ~57%, colocado no
+        /// segundo pau ~47%, pênalti com o canto certo ~45%, bola no meio quase nunca.
         /// </summary>
         public void OnShot(Vector3 ballPos, Vector3 ballVel, float curve, bool screened, int? guess = null, Vector3? truth = null)
         {
@@ -72,14 +79,16 @@ namespace Camisa10.UI
             origin = T.position;
             float plane = origin.z;
             float t = (plane - ballPos.z) / Mathf.Max(1f, ballVel.z);
-            // previsão: trajetória sem efeito + só parte do efeito (é aí que a curva engana)
+            // previsão: trajetória sem efeito + parte do efeito (é aí que a curva engana; efeito exagerado ele percebe)
             var p = ballPos + ballVel * t + .5f * Physics.gravity * t * t;
-            p.x += .5f * curve * t * t * Mathf.Lerp(.75f, .92f, skill);
+            float fool = Mathf.Clamp(curve, -2.5f, 2.5f);
+            p.x += .5f * t * t * (curve - fool * (1f - Mathf.Lerp(.62f, .82f, skill)));
             float err = Mathf.Lerp(.55f, .2f, skill) * (.6f + Mathf.Abs(curve) * .12f) * Mathf.Clamp(ballVel.magnitude / 20f, .6f, 1.5f);
             p.x += (float)Rng.Gauss() * err;
             p.y += (float)Rng.Gauss() * err * .6f;
+            t *= 1.12f; // o ar freia a bola: ela chega um pouco depois do que a conta sem arrasto diz
 
-            float react = Mathf.Lerp(.23f, .2f, skill) * R(.9f, 1.12f) + (screened ? .08f : 0f);
+            float react = Mathf.Lerp(.225f, .205f, skill) * R(.9f, 1.12f) + (screened ? .08f : 0f);
             if (guess.HasValue)
             {
                 // pênalti: não dá tempo de reagir, ele adivinha o canto e salta junto com a batida
@@ -88,7 +97,7 @@ namespace Camisa10.UI
                 if (guess.Value == 0) p = new Vector3(origin.x, R(.4f, 1.4f), plane);
                 else if (Mathf.Sign(b.x) == guess.Value)
                     // acertou o lado: ajusta pela altura e pela distância que viu no corpo do batedor
-                    p = new Vector3(origin.x + guess.Value * Mathf.Clamp(Mathf.Abs(b.x) * .85f + (float)Rng.Gauss() * .8f, 1.4f, 3f), b.y * .8f + (float)Rng.Gauss() * .3f, plane);
+                    p = new Vector3(origin.x + guess.Value * Mathf.Clamp(Mathf.Abs(b.x) * .95f + (float)Rng.Gauss() * .7f, 1.4f, 3f), b.y * .8f + (float)Rng.Gauss() * .3f, plane);
                 else p = new Vector3(origin.x + guess.Value * R(1.8f, 2.8f), R(.3f, 1.6f), plane);
             }
             aim = new Vector3(p.x, Mathf.Clamp(p.y, 0, 2.6f), plane);
@@ -99,16 +108,19 @@ namespace Camisa10.UI
             float dx = aim.x - origin.x;
             side = Mathf.Sign(dx); if (side == 0) side = 1;
             float adx = Mathf.Abs(dx);
-            // escolhe o corpo: deslocar os pés, subir o quadril e girar até as mãos apontarem para a bola
-            shiftMax = Mathf.Min(adx * .45f, Mathf.Lerp(1.1f, 1.5f, skill));
-            riseMax = Mathf.Clamp(aim.y - .9f, 0, .55f) + (adx > 1.2f ? .15f : 0);
-            float lateral = Mathf.Max(0, adx - shiftMax), up = Mathf.Max(.2f, aim.y - riseMax);
-            rollMax = Mathf.Clamp(Mathf.Atan2(lateral, up) * Mathf.Rad2Deg, 0, 92);
-            // tempo para esticar: ~0,7 s até o canto (medido em goleiros profissionais), menos para bolas perto do corpo
-            diveDur = Mathf.Lerp(.7f, .65f, skill) * Mathf.Lerp(.55f, 1f, Mathf.Clamp01(adx / 3f)) * (late ? 1.25f : 1f);
+            float baseDur = Mathf.Lerp(.7f, .66f, skill);
+            diveDur = baseDur * Mathf.Lerp(.55f, 1f, Mathf.Clamp01(adx / 3f)) * (guess.HasValue ? .84f : 1f) * (late ? 1.25f : 1f);
+            // quanto o quadril voa de lado: impulso + um passo antes, se sobrar tempo (menos se a bola tem efeito)
+            float spare = Mathf.Max(0, t - react - baseDur - .1f);
+            hipShift = Mathf.Min(adx * .62f, Mathf.Lerp(1.42f, 1.6f, skill) + Mathf.Min(.75f, spare * (Mathf.Abs(curve) > .5f ? 1.1f : 2.2f)));
+            // quadril termina baixo em bola rasteira e alto em bola no ângulo; o corpo gira até as mãos apontarem para ela
+            hipEndY = Mathf.Clamp(aim.y * .55f + .35f, .45f, 1.5f);
+            rollMax = Mathf.Clamp(Mathf.Atan2(Mathf.Max(0, adx - hipShift), aim.y - hipEndY) * Mathf.Rad2Deg, 0, 112);
+            extMax = Mathf.Lerp(1.22f, 1.34f, skill);
+            originHip = origin + Vector3.up * HipH;
         }
 
-        /// <summary>Progresso do mergulho (0 a 1). Calibrado por simulação: goleiro médio defende ~50% do canto baixo com força a 18 m.</summary>
+        /// <summary>Progresso do mergulho (0 a 1).</summary>
         float Progress() => Mathf.Clamp01((Time.time - diveStart) / diveDur);
         static float Ease(float p) => p * p * (3f - 2f * p); // o impulso das pernas leva um instante para ganhar velocidade
 
@@ -116,8 +128,13 @@ namespace Camisa10.UI
         {
             if (down)
             {
-                // já caiu: fica no chão
-                var pd = T.position; pd.y = Mathf.MoveTowards(pd.y, 0, 3f * dt); T.position = pd;
+                // caindo e deitando de lado no gramado (quadril vai para perto do chão)
+                float u = Mathf.Clamp01((Time.time - landStart) / .35f);
+                var lyRot = Quaternion.LookRotation(Vector3.back) * Quaternion.Euler(0, 0, side * Mathf.Clamp(Mathf.Max(rollMax, 82f), 82f, 100f));
+                T.rotation = Quaternion.Slerp(landFrom, lyRot, u * u);
+                var hip = T.position + T.up * HipH;
+                hip.y = Mathf.MoveTowards(hip.y, .22f, 4f * dt);
+                T.position = hip - T.up * HipH;
                 return;
             }
             if (!diving)
@@ -126,19 +143,21 @@ namespace Camisa10.UI
                 return;
             }
             float p = Progress(), e = Ease(p);
-            var pos = origin + new Vector3(side * shiftMax * e, riseMax * Mathf.Sin(Mathf.Min(1f, p * 1.15f) * Mathf.PI * .5f), 0);
-            T.position = pos;
-            var yaw = Quaternion.LookRotation(Vector3.back);
-            T.rotation = yaw * Quaternion.Euler(0, 0, side * rollMax * e); // de frente para o campo, girando para o lado
-            if (p >= 1f && Time.time - diveStart > diveDur + .25f) Land();
+            // quadril: sai agachado, voa de lado num arco (corpo fora do chão) até a altura da defesa
+            var hipPos = originHip + new Vector3(side * hipShift * e, Mathf.Lerp(.85f, hipEndY, e) - HipH + Mathf.Sin(p * Mathf.PI) * .12f, 0);
+            T.rotation = Quaternion.LookRotation(Vector3.back) * Quaternion.Euler(0, 0, side * rollMax * e);
+            T.position = hipPos - T.up * HipH; // o corpo gira em volta do quadril
+            if (p >= 1f && Time.time - diveStart > diveDur + .2f) Land();
         }
 
         /// <summary>Começa o lance caído (rebote de uma defesa anterior).</summary>
         public void SetDown(float side)
         {
-            down = true; diving = false; rising = false; downSide = side;
+            down = true; diving = false; rising = false; downSide = side; this.side = side;
+            rollMax = 88f; landStart = Time.time - 1f; landFrom = T.rotation;
             var p = T.position; p.y = 0; T.position = p;
-            T.rotation = Quaternion.LookRotation(Vector3.back) * Quaternion.Euler(0, 0, side * 85f);
+            T.rotation = Quaternion.LookRotation(Vector3.back) * Quaternion.Euler(0, 0, side * 88f);
+            T.position = new Vector3(p.x, .22f, p.z) - T.up * HipH;
             rig?.Set(PersonRig.Mode.Dive);
         }
 
@@ -147,23 +166,24 @@ namespace Camisa10.UI
         {
             if (!down) return;
             down = false; rising = true; riseStart = Time.time;
+            var p = T.position; T.rotation = Quaternion.LookRotation(Vector3.back); p.y = 0; T.position = p;
             rig?.Set(PersonRig.Mode.Stumble);
         }
 
-        /// <summary>Termina o mergulho deitado no gramado.</summary>
+        /// <summary>Termina o mergulho caindo de lado no gramado.</summary>
         public void Land()
         {
             if (down) return;
             down = true; diving = false;
-            T.rotation = Quaternion.LookRotation(Vector3.back) * Quaternion.Euler(0, 0, side * Mathf.Max(rollMax, 80f));
+            landStart = Time.time; landFrom = T.rotation;
         }
 
-        /// <summary>Segmento do corpo agora: dos pés às mãos (com braços esticados no mergulho).</summary>
+        /// <summary>Segmento do corpo agora: dos pés às mãos (braços esticados acima da cabeça no mergulho).</summary>
         void Body(out Vector3 a, out Vector3 b)
         {
-            float ext = diving ? Mathf.Lerp(1.95f, Reach, Ease(Progress())) : 1.95f;
-            a = T.position + T.up * .25f;
-            b = T.position + T.up * ext;
+            float ext = diving ? extMax * Mathf.Lerp(.85f, 1f, Ease(Progress())) : 1.0f;
+            a = T.position + T.up * .1f;
+            b = T.position + T.up * (HipH + ext);
         }
 
         static float SegDist(Vector3 p, Vector3 a, Vector3 b)

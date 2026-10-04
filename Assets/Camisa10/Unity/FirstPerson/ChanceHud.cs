@@ -112,7 +112,7 @@ namespace Camisa10.UI
             powerGo = pb.gameObject;
             var prt = pb.rectTransform;
             prt.anchorMin = prt.anchorMax = new Vector2(1, 0);
-            prt.sizeDelta = new Vector2(44, 300); prt.anchoredPosition = new Vector2(-385, 260);
+            prt.sizeDelta = new Vector2(40, 300); prt.anchoredPosition = new Vector2(-362, 300);
             pb.raycastTarget = false;
             powerSweet = UIKit.Img(pb.transform, Theme.Alpha(Theme.Turf, .28f), false, "Ideal");
             powerSweet.raycastTarget = false;
@@ -291,7 +291,7 @@ namespace Camisa10.UI
 
         // ---------- controles na tela ----------
         public VirtualStick Stick;
-        public TouchButton Shoot, PassBtn, Dribble, Sprint, TackleL, TackleR, Skill;
+        public TouchButton Shoot, PassBtn, Dribble, Sprint, TackleL, TackleR, Skill, Finesse;
         Text skillHint;
         Image staminaFill, dribbleRing;
         GameObject stickGo;
@@ -352,11 +352,12 @@ namespace Camisa10.UI
 
             // botões (canto inferior direito)
             Shoot = RoundButton(safe, "CHUTAR", Theme.Turf, Theme.TurfInk, br, new Vector2(-220, 230), 230, 40);
-            PassBtn = RoundButton(safe, "PASSE", Theme.Cyan, Theme.TurfInk, br, new Vector2(-480, 150), 150, 30);
-            Dribble = RoundButton(safe, "DRIBLE", Theme.Gold, Theme.GoldInk, br, new Vector2(-450, 380), 150, 30);
+            Finesse = RoundButton(safe, "COLOCADO", Theme.Hex("#2E7DFF"), Color.white, br, new Vector2(-490, 160), 160, 26);
+            PassBtn = RoundButton(safe, "PASSE", Theme.Cyan, Theme.TurfInk, br, new Vector2(-725, 130), 140, 30);
+            Dribble = RoundButton(safe, "DRIBLE", Theme.Gold, Theme.GoldInk, br, new Vector2(-470, 395), 145, 30);
             Sprint = RoundButton(safe, "CORRER", Theme.Purple, Color.white, br, new Vector2(-210, 480), 140, 28);
             Sprint.Sticky = true;
-            Skill = RoundButton(safe, "FIRULA", Theme.Hex("#FF7A1A"), Color.white, br, new Vector2(-690, 290), 150, 28);
+            Skill = RoundButton(safe, "FIRULA", Theme.Hex("#FF7A1A"), Color.white, br, new Vector2(-715, 330), 145, 28);
             skillHint = UIKit.Txt(Skill.transform, "", 20, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
             skillHint.rectTransform.anchorMin = new Vector2(.5f, 0); skillHint.rectTransform.anchorMax = new Vector2(.5f, 0);
             skillHint.rectTransform.sizeDelta = new Vector2(220, 28); skillHint.rectTransform.anchoredPosition = new Vector2(0, -22);
@@ -390,6 +391,7 @@ namespace Camisa10.UI
             stickGo.SetActive(stick);
             Skill.gameObject.SetActive(stick); // firulas só com a bola nos pés
             Shoot.gameObject.SetActive(shoot);
+            Finesse.gameObject.SetActive(shoot && stick);
             PassBtn.gameObject.SetActive(pass);
             Dribble.gameObject.SetActive(dribble);
             Sprint.gameObject.SetActive(sprint);

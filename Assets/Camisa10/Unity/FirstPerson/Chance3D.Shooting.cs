@@ -14,7 +14,7 @@ namespace Camisa10.UI
         bool setPiece;           // falta ou pênalti: mira arrastável
         Vector3 aimPoint;        // alvo no plano do gol (z = 0)
         int curveSteps;          // efeito escolhido na falta (-3 a 3)
-        bool charging;
+        bool charging, finesse; // finesse = chute colocado (efeito, mais preciso, menos força)
         float chargeStart;
         bool keeperHolds;
         float headArrive = -1;
@@ -32,8 +32,12 @@ namespace Camisa10.UI
             setPiece = type == "falta" || type == "penalti";
             hud.Pad.AimMode = setPiece || type == "cabeceio" || type == "corte";
             hud.Pad.OnAimDrag = AimDrag;
-            hud.Shoot.OnPress = ShootPress;
+            hud.Shoot.OnPress = () => ShootPress(false);
             hud.Shoot.OnRelease = ShootRelease;
+            hud.Finesse.OnPress = () => ShootPress(true);
+            hud.Finesse.OnRelease = ShootRelease;
+            // o colocado existe em jogada corrida e no pênalti (cavadinha/colocado no canto)
+            hud.Finesse.gameObject.SetActive(carry || type == "penalti" || type == "rebote");
             hud.CurveL.OnPress = () => { curveSteps = Mathf.Max(-3, curveSteps - 1); hud.Curve(true, curveSteps); };
             hud.CurveR.OnPress = () => { curveSteps = Mathf.Min(3, curveSteps + 1); hud.Curve(true, curveSteps); };
             hud.Curve(type == "falta", curveSteps);
@@ -72,6 +76,14 @@ namespace Camisa10.UI
         Vector3 OpenPlayTarget(float power)
         {
             var b = A.Ball.transform.position;
+            if (finesse)
+            {
+                // colocado: no ângulo do segundo pau, a não ser que o joystick escolha o outro lado
+                float far = b.x > .5f ? -1 : b.x < -.5f ? 1 : (keeper.position.x > 0 ? -1 : 1);
+                var sk = hud.Stick != null ? hud.Stick.Value : Vector2.zero;
+                if (Mathf.Abs(sk.x) > .35f) far = Mathf.Sign(sk.x) * (A.Cam.transform.right.x >= 0 ? 1 : -1);
+                return new Vector3(far * Mathf.Lerp(2.7f, 3.2f, power), Mathf.Lerp(.9f, 1.9f, power), 0);
+            }
             float kx = keeper.position.x;
             float side = Mathf.Abs(kx - b.x * .3f) < .3f ? (b.x > 0 ? -1 : 1) : (kx > b.x * .3f ? -1 : 1);
             var st = hud.Stick != null ? hud.Stick.Value : Vector2.zero;
@@ -122,9 +134,10 @@ namespace Camisa10.UI
         }
 
         // ---------- chute ----------
-        void ShootPress()
+        void ShootPress(bool placed)
         {
-            if (!CanAct()) return;
+            if (!CanAct() || charging) return;
+            finesse = placed && type != "cabeceio" && type != "corte";
             if (type == "cabeceio") { HeaderButton(); return; }
             if (type == "corte") { CorteButton(); return; }
             if (type == "defesa") return;
@@ -144,33 +157,48 @@ namespace Camisa10.UI
 
             Vector3 target = setPiece ? aimPoint : OpenPlayTarget(power);
             // força demais levanta a bola (isola); de menos, ela vai rasteira e fraca
-            if (power > SweetMax) target.y += (power - SweetMax) * 10f;
-            float curve = type == "falta" ? curveSteps * (1.3f + Stat(Attr.Dri) * .022f) : 0f;
+            if (power > SweetMax) target.y += (power - SweetMax) * (finesse ? 6f : 10f);
+            var b = A.Ball.transform.position;
+            float dri = Stat(Attr.Dri);
+            Vector3 spin;
             float acc = type == "penalti" ? Stat(Attr.Fin) + 12 : Stat(Attr.Fin);
-            FireShot(target, power, curve, acc, 1f);
+            float scale = 1f;
+            if (type == "falta")
+            {
+                // efeito escolhido nos botões: lateral para contornar a barreira, por cima para cair atrás dela
+                spin = new Vector3(8f + power * 6f, curveSteps * (11f + dri * .08f), 0);
+            }
+            else if (finesse)
+            {
+                // colocado: efeito lateral que abre e fecha no canto; mais preciso, menos forte
+                float inward = -Mathf.Sign(target.x == 0 ? 1 : target.x);
+                spin = new Vector3(4f, inward * (24f + dri * .22f), 0);
+                acc += 18 + dri * .1f;
+                scale = .8f;
+            }
+            else spin = new Vector3(5f + power * 8f, R(-3, 3), 0); // chute forte: seco, cai um pouco no fim
+            FireShot(target, power, spin, acc, scale);
+            finesse = false;
         }
 
-        /// <summary>Chute com efeito: mira já compensada para a curva terminar no alvo.</summary>
-        void FireShot(Vector3 target, float power, float curve, float accuracyAttr, float powerScale)
+        /// <summary>Chute com física real: o giro curva/derruba a bola e a trajetória é resolvida para terminar no alvo.</summary>
+        void FireShot(Vector3 target, float power, Vector3 spin, float accuracyAttr, float powerScale)
         {
             var start = A.Ball.transform.position;
-            float speed = Mathf.Lerp(12f, 24f + Stat(Attr.Fis) * .1f, power) * powerScale;
+            float speed = Mathf.Lerp(13f, 27f + Stat(Attr.Fis) * .1f, power) * powerScale;
             float dist = HorizDist(start, target);
             // erro de execução: cresce com a distância, com a força e com a finalização fraca
             float sigma = Mathf.Max(.04f, (1f - accuracyAttr * .0085f) * (.45f + power * .75f) * (dist / 16f));
             target.x += (float)Rng.Gauss() * sigma;
             target.y += (float)Rng.Gauss() * sigma * .7f;
-            float T = dist / Mathf.Max(1f, speed);
-            var aimAt = target - new Vector3(.5f * curve * T * T, 0, 0); // a curva traz a bola de volta ao alvo
             carry = false;
             hud.HideControls();
             hud.Reticle(false); hud.Timing(false); hud.Curve(false); hud.Power(false);
             kickT = 0;
             sfx?.Kick(.5f + power * .5f);
             foreach (var bl in blockers) if (wallJump) Rig(bl).Set(PersonRig.Mode.Jump);
-            curveAccel = curve;
-            Launch(start, aimAt, speed);
-            A.Ball.angularVelocity = new Vector3(R(-6, 6), -curve * 4f, 0);
+            Launch(start, target, speed, spin);
+            float curve = curveAccel;
             shotTime = Time.time;
             phase = Phase.Flight;
             hud.SetHint("");
@@ -199,7 +227,7 @@ namespace Camisa10.UI
             A.Ball.transform.position = headPoint;
             float acc = (Stat(Attr.Fin) + Stat(Attr.Fis)) / 2f * Mathf.Lerp(.55f, 1.12f, q);
             if (q > .75f) { hud.Banner("NA MEDIDA!", Theme.FeedGold); StartCoroutine(HideBanner(.5f)); }
-            FireShot(aimPoint, Mathf.Lerp(.35f, .75f, q), 0, acc, .72f);
+            FireShot(aimPoint, Mathf.Lerp(.35f, .75f, q), Vector3.zero, acc, .72f);
         }
 
         // ---------- goleiro na hora do cruzamento da linha ----------

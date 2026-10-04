@@ -153,8 +153,8 @@ namespace Camisa10.UI
                     {
                         float tv = v / HumanModel.TorsoV; // 0 = barra, 1 = gola
                         c = Body(k, u, tv);
-                        if (tv > .95f) c = k.Trim;                                        // gola
-                        else if (tv > .93f && Mathf.Abs(Mathf.Repeat(u - .25f + .5f, 1f) - .5f) < .05f) c = k.Trim; // decote em V na frente
+                        if (tv > .978f) c = k.Trim;                                       // gola fina
+                        else if (tv > .955f && Mathf.Abs(Mathf.Repeat(u - .25f + .5f, 1f) - .5f) < .03f) c = k.Trim; // decote em V na frente
                     }
                     // trama do tecido: leve variação
                     float n = 1f + (((x * 7 + y * 13) & 3) - 1.5f) * .012f;
