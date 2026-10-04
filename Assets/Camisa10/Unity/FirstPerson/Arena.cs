@@ -19,6 +19,9 @@ namespace Camisa10.UI
         LightShadows sceneShadows;
         float sceneIntensity;
         Quaternion sceneLightRot;
+        bool prevFog; Color prevFogColor; float prevFogStart, prevFogEnd; FogMode prevFogMode;
+        Material prevSky; int prevAA;
+        static Material skyMat;
 
         static Material baseMat;
         static readonly Dictionary<string, Material> mats = new Dictionary<string, Material>();
@@ -86,18 +89,27 @@ namespace Camisa10.UI
         static Texture2D Grass()
         {
             if (grassTex != null) return grassTex;
-            int w = 256, h = 1024;
-            grassTex = new Texture2D(w, h, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, anisoLevel = 8 };
+            int w = 512, h = 2048;
+            grassTex = new Texture2D(w, h, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, anisoLevel = 16 };
             var px = new Color32[w * h];
+            float ox = Rng.RangeInt(0, 1000), oy = Rng.RangeInt(0, 1000);
             for (int y = 0; y < h; y++)
             {
-                bool light = (y / 56) % 2 == 0; // faixas de corte da grama (~5 m)
+                // faixas de corte (~5 m) com transição suave, como grama cortada em sentidos opostos
+                float band = Mathf.Sin(y / (float)h * Mathf.PI * 2 * 9.5f);
+                float stripe = Mathf.SmoothStep(-1, 1, band * 3f) * 2 - 1;
                 for (int x = 0; x < w; x++)
                 {
-                    bool check = ((x / 64) % 2 == 0) == light;
-                    float g = (light ? 132 : 112) + (check ? 4 : -2);
-                    float n = Rng.RangeInt(-10, 10);
-                    px[y * w + x] = new Color32((byte)(g * .38f + n * .5f), (byte)(g + n), (byte)(g * .36f + n * .4f), 255);
+                    float big = Mathf.PerlinNoise(ox + x * .008f, oy + y * .008f);
+                    float mid = Mathf.PerlinNoise(ox + x * .05f, oy + y * .05f);
+                    float fine = Mathf.PerlinNoise(ox + x * .45f, oy + y * .12f);
+                    float g = 118 + stripe * 11 + (big - .5f) * 22 + (mid - .5f) * 12 + (fine - .5f) * 26;
+                    // desgaste perto da área (parte de cima da textura fica na linha do gol)
+                    float wear = Mathf.Clamp01((y / (float)h - .78f) * 4f) * Mathf.Clamp01(1 - Mathf.Abs(x / (float)w - .5f) * 3f);
+                    float dirt = wear * Mathf.Clamp01(mid * 1.6f - .5f) * .5f;
+                    float r = g * .34f, gg = g, bl = g * .3f;
+                    r = Mathf.Lerp(r, 112, dirt); gg = Mathf.Lerp(gg, 96, dirt); bl = Mathf.Lerp(bl, 60, dirt);
+                    px[y * w + x] = new Color32((byte)Mathf.Clamp(r, 0, 255), (byte)Mathf.Clamp(gg, 0, 255), (byte)Mathf.Clamp(bl, 0, 255), 255);
                 }
             }
             grassTex.SetPixels32(px);
@@ -108,15 +120,15 @@ namespace Camisa10.UI
         static Texture2D Crowd()
         {
             if (crowdTex != null) return crowdTex;
-            int w = 256, h = 64;
+            int w = 512, h = 128;
             crowdTex = new Texture2D(w, h, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Bilinear };
             var px = new Color32[w * h];
             var seat = new Color32(48, 52, 62, 255);
             for (int i = 0; i < px.Length; i++) px[i] = seat;
             Color32[] shirts = { new Color32(214, 46, 46, 255), new Color32(240, 240, 240, 255), new Color32(36, 72, 170, 255), new Color32(250, 204, 48, 255), new Color32(28, 28, 28, 255), new Color32(30, 130, 70, 255) };
             Color32[] skins = { new Color32(241, 201, 165, 255), new Color32(198, 138, 94, 255), new Color32(120, 80, 52, 255) };
-            for (int row = 0; row < 4; row++)
-                for (int col = 0; col < 32; col++)
+            for (int row = 0; row < 8; row++)
+                for (int col = 0; col < 64; col++)
                 {
                     if (Rng.Chance(.12)) continue; // cadeiras vazias
                     int cx = col * 8 + 4 + Rng.RangeInt(-1, 1), cy = row * 16;
@@ -185,6 +197,30 @@ namespace Camisa10.UI
             sun.shadows = LightShadows.Soft;
             sun.transform.rotation = Quaternion.Euler(42, -35, 0);
             QualitySettings.shadowDistance = 90;
+            a.prevAA = QualitySettings.antiAliasing;
+            QualitySettings.antiAliasing = 4; // linhas do campo e traves sem serrilhado
+            a.prevSky = RenderSettings.skybox;
+            a.prevFog = RenderSettings.fog; a.prevFogColor = RenderSettings.fogColor; a.prevFogMode = RenderSettings.fogMode;
+            a.prevFogStart = RenderSettings.fogStartDistance; a.prevFogEnd = RenderSettings.fogEndDistance;
+            if (skyMat == null)
+            {
+                var sh = Shader.Find("Skybox/Procedural"); // pode não existir no build; aí fica a cor sólida
+                if (sh != null)
+                {
+                    skyMat = new Material(sh);
+                    skyMat.SetFloat("_SunSize", .03f);
+                    skyMat.SetFloat("_AtmosphereThickness", .9f);
+                    skyMat.SetColor("_SkyTint", new Color(.45f, .6f, .85f));
+                    skyMat.SetColor("_GroundColor", new Color(.35f, .38f, .4f));
+                    skyMat.SetFloat("_Exposure", 1.25f);
+                }
+            }
+            if (skyMat != null) RenderSettings.skybox = skyMat;
+            RenderSettings.fog = true;
+            RenderSettings.fogMode = FogMode.Linear;
+            RenderSettings.fogColor = new Color(.62f, .7f, .8f);
+            RenderSettings.fogStartDistance = 70;
+            RenderSettings.fogEndDistance = 260;
             RenderSettings.ambientLight = new Color(.55f, .6f, .68f);
 
             // câmera em primeira pessoa (usa o céu da cena quando existir)
@@ -201,7 +237,7 @@ namespace Camisa10.UI
             // gramado (com colisor, a bola quica nele)
             var pitch = Prim(PrimitiveType.Plane, R, new Vector3(0, 0, -30), new Vector3(9, 1, 9), TexMat(Grass(), Vector2.one), true);
             pitch.name = "Gramado";
-            Prim(PrimitiveType.Plane, R, new Vector3(0, -.02f, -30), new Vector3(30, 1, 30), Mat(Theme.Hex("#2E6B34"), .05f)).name = "Entorno";
+            Prim(PrimitiveType.Plane, R, new Vector3(0, -.02f, -30), new Vector3(30, 1, 30), Mat(Theme.Hex("#2F5E2E"), .05f)).name = "Entorno";
 
             // marcações
             var white = Mat(new Color(.96f, .96f, .96f), .1f);
@@ -350,6 +386,10 @@ namespace Camisa10.UI
                 sceneLight.intensity = sceneIntensity;
                 sceneLight.transform.rotation = sceneLightRot;
             }
+            QualitySettings.antiAliasing = prevAA;
+            RenderSettings.skybox = prevSky;
+            RenderSettings.fog = prevFog; RenderSettings.fogColor = prevFogColor; RenderSettings.fogMode = prevFogMode;
+            RenderSettings.fogStartDistance = prevFogStart; RenderSettings.fogEndDistance = prevFogEnd;
             if (Root != null) Object.Destroy(Root.gameObject);
         }
     }

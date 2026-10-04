@@ -142,6 +142,8 @@ namespace Camisa10.UI
             topFillWasOn = topFill.gameObject.activeSelf;
             safe.gameObject.SetActive(false);
             background.gameObject.SetActive(false);
+            // a faixa preta de fundo cobre a tela inteira: sem esconder, a câmera 3D do lance fica invisível
+            letterbox.gameObject.SetActive(false);
             topFill.gameObject.SetActive(false);
             chanceHud = ChanceHud.Build(canvasRoot);
             chance = Chance3D.Play(transform, game, match, chanceHud, OnChanceDone);
@@ -155,6 +157,7 @@ namespace Camisa10.UI
             chanceHud = null;
             safe.gameObject.SetActive(true);
             background.gameObject.SetActive(true);
+            letterbox.gameObject.SetActive(true);
             topFill.gameObject.SetActive(topFillWasOn);
             if (match == null) return;
             match.ResolveLive(outcome);

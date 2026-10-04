@@ -21,7 +21,7 @@ namespace Camisa10.UI
 
         RectTransform safe, header, nav, overlays, topFill;
         Transform canvasRoot;
-        Image background;
+        Image background, letterbox;
         CanvasScaler scaler;
         ScrollRect scroll;
         RectTransform content;
@@ -112,7 +112,7 @@ namespace Camisa10.UI
             cgo.AddComponent<GraphicRaycaster>();
 
             canvasRoot = cgo.transform;
-            var letterbox = UIKit.Img(cgo.transform, Color.black, false, "Letterbox");
+            letterbox = UIKit.Img(cgo.transform, Color.black, false, "Letterbox");
             UIKit.Stretch(letterbox.rectTransform);
             letterbox.raycastTarget = false;
             var bg = UIKit.Img(cgo.transform, Color.white, false, "Background");
