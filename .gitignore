@@ -22,3 +22,7 @@
 
 # temporários do build Android (gerados pela Unity)
 /.utmp/
+
+# simulador de regras (saída de build)
+/Tools/Simulador/bin/
+/Tools/Simulador/obj/

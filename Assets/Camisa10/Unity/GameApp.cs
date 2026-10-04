@@ -45,7 +45,7 @@ namespace Camisa10.UI
         string negMsg = "";
 
         /// <summary>Versão mostrada no topo: confirma que a Unity está rodando o código novo.</summary>
-        public const string Version = "0.10";
+        public const string Version = "0.11";
 
         // abas do menu principal (ordem da barra)
         static readonly (string id, string label)[] Tabs =
@@ -279,6 +279,7 @@ namespace Camisa10.UI
             var se = game.S.season;
             if (se.phase == "end")
             {
+                if (game.WorldCupActive) return ("Jogar a Copa", StartWorldCupMatch);
                 if (game.MustRetire) return ("Fim de carreira", () => { tab = "home"; Render(true); });
                 if (!game.CanStartNextSeason) return ("Escolha um contrato", () => { tab = "contract"; Render(true); });
                 return ($"Iniciar {game.S.year + 1}", () => { game.NextSeason(); tab = "home"; Commit(null, true); });

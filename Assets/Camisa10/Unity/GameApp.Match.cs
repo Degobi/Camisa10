@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Collections;
 using Camisa10.Core;
 using UnityEngine;
@@ -19,8 +21,23 @@ namespace Camisa10.UI
         ChanceHud chanceHud;
         bool topFillWasOn;
 
+        bool worldCupMatch; // partida da Copa do Mundo (não conta para a liga)
+
+        void StartWorldCupMatch()
+        {
+            match = game.NewWorldCupMatch();
+            if (match == null) return;
+            worldCupMatch = true;
+            fast = false;
+            feedShown = 0;
+            BuildMatchOverlay();
+            RefreshMatch();
+            RunLoop(.7f);
+        }
+
         void StartMatch()
         {
+            worldCupMatch = false;
             match = new MatchEngine(game);
             fast = false;
             feedShown = 0;
@@ -118,6 +135,7 @@ namespace Camisa10.UI
                     UIKit.Txt(dock, Fmt.Rating(match.Rating), 110, Theme.Gold, FontStyle.Bold, TextAnchor.MiddleCenter);
                     string extra = match.Sent ? ", expulso" : match.Yellow ? ", 1 amarelo" : "";
                     UIKit.Txt(dock, $"{match.Goals} gol(s), {match.Assists} assistência(s){extra}", 26, Theme.Muted, FontStyle.Normal, TextAnchor.UpperCenter);
+                    UIKit.Txt(dock, PointsBreakdown(match), 24, Theme.Ink, FontStyle.Normal, TextAnchor.UpperCenter);
                 }
                 else UIKit.Muted(dock, "Você não entrou em campo nesta rodada.").alignment = TextAnchor.UpperCenter;
                 UIKit.GoldBtn(dock, "Concluir rodada", EndMatchUI);
@@ -126,6 +144,8 @@ namespace Camisa10.UI
             {
                 dockImg.color = Theme.Alpha(Theme.Dock, .6f);
                 UIKit.Label(dock, "Partida em andamento", Theme.Muted, 22).alignment = TextAnchor.MiddleCenter;
+                if (match.Plays && match.Actions.Count > 0)
+                    UIKit.Txt(dock, $"Nota ao vivo {Fmt.Rating(match.Rating)}  ·  {(match.Points >= 0 ? "+" : "")}{match.Points} pts", 30, Theme.Gold, FontStyle.Bold, TextAnchor.MiddleCenter);
                 UIKit.Txt(dock, "Os lances decisivos são seus: quando chegar a hora, você joga em primeira pessoa.", 26, Theme.Ink,
                     FontStyle.Normal, TextAnchor.MiddleCenter);
                 UIKit.Btn(dock, fast ? "Velocidade normal" : "Acelerar", Theme.Chip, Color.white,
@@ -134,6 +154,26 @@ namespace Camisa10.UI
 
             Canvas.ForceUpdateCanvases();
             feedScroll.verticalNormalizedPosition = 0;
+        }
+
+        /// <summary>"Gol +10 · Drible ×2 +6 · Passe errado −2": de onde veio a nota.</summary>
+        static string PointsBreakdown(MatchEngine m)
+        {
+            var groups = new List<(string label, int count, int pts)>();
+            foreach (var a in m.Actions)
+            {
+                int i = groups.FindIndex(x => x.label == a.Label);
+                if (i < 0) groups.Add((a.Label, 1, a.Points));
+                else groups[i] = (a.Label, groups[i].count + 1, groups[i].pts + a.Points);
+            }
+            if (groups.Count == 0) return "Nenhuma ação sua registrada.";
+            var parts = new List<string>();
+            foreach (var x in groups)
+            {
+                string col = x.pts >= 0 ? "#19E68C" : "#FF5468";
+                parts.Add($"{x.label}{(x.count > 1 ? " ×" + x.count : "")} <color={col}>{(x.pts > 0 ? "+" : "")}{x.pts}</color>");
+            }
+            return string.Join("  ·  ", parts) + $"\n<b>Total {(m.Points >= 0 ? "+" : "")}{m.Points} pts</b>  (nota = 6,0 + pontos ÷ 10)";
         }
 
         void StartChance()
@@ -199,10 +239,13 @@ namespace Camisa10.UI
         {
             if (match == null || !match.Done) return;
             if (matchCo != null) StopCoroutine(matchCo);
-            game.FinishMatch(match);
+            string wcLine = worldCupMatch ? game.FinishWorldCupMatch(match) : null;
+            if (!worldCupMatch) game.FinishMatch(match);
+            worldCupMatch = false;
             match = null;
             Destroy(matchRoot);
             Commit(null, true);
+            if (wcLine != null) ShowModal(game.S.wc.champion ? "CAMPEÃO DO MUNDO!" : "Copa do Mundo", wcLine, ("Continuar", (Action)CloseModal, true));
         }
     }
 }

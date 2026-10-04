@@ -38,7 +38,13 @@ namespace Camisa10.Core
                 for (int i = 0; i < L.Clubs.Length; i++)
                 {
                     var c = S.clubs.Find(x => x.id == L.Id + i);
-                    if (c == null) continue;
+                    if (c == null)
+                    {
+                        // liga nova numa carreira antiga: o clube entra no mercado
+                        var d = L.Clubs[i];
+                        S.clubs.Add(new Club { id = L.Id + i, name = d.name, league = L.Id, str = d.str, c1 = d.c1, c2 = d.c2 });
+                        continue;
+                    }
                     c.name = L.Clubs[i].name; c.c1 = L.Clubs[i].c1; c.c2 = L.Clubs[i].c2;
                 }
         }
@@ -427,6 +433,7 @@ namespace Camisa10.Core
 
             if (rank == 1) sm.titles.Add($"Campeão {GameData.Of(L.Name)} {se.year}");
             GloryEndSeason(sm, avg);
+            WorldCupAtSeasonEnd(sm);
 
             foreach (var d in S.activeSponsors.ToList())
             {
@@ -470,9 +477,34 @@ namespace Camisa10.Core
         List<ContractOffer> GenOffers()
         {
             var p = S.player; int o = Ovr; var se = S.season;
-            bool Eligible(Club c) => c.league == "br" || (c.league == "ib" && (p.fame >= 22 || o >= 68)) || (c.league == "en" && (p.fame >= 32 || o >= 72));
+            // cada mercado tem sua exigência: Europa quer geral ou fama; Arábia e MLS preferem nomes conhecidos e mais experientes
+            bool Eligible(Club c)
+            {
+                var L = League(c.league);
+                if (L == null) return false;
+                if (c.league == "sa" || c.league == "us") return false; // mercados especiais: só por convite (abaixo) ou sondagem
+                if (L.MinFame <= 0 && L.MinOvr <= 0) return true;
+                if (p.age < L.MinAge && p.fame < L.MinFame + 25) return false;
+                return p.fame >= L.MinFame || o >= L.MinOvr;
+            }
             var cands = S.clubs.Where(c => c.id != S.contract.club && c.str >= o - 12 && c.str <= o + 5 && Eligible(c)).ToList();
             Rng.Shuffle(cands);
+            // sondagem aceita durante a temporada: o clube interessado manda proposta com certeza
+            if (!string.IsNullOrEmpty(S.interestLeague))
+            {
+                var keen = S.clubs.Where(c => c.league == S.interestLeague && c.id != S.contract.club).OrderByDescending(c => c.str).Take(3).ToList();
+                if (keen.Count > 0) cands.Insert(0, keen[Rng.RangeInt(0, keen.Count - 1)]);
+                S.interestLeague = null;
+            }
+            // a proposta milionária do Golfo ou dos EUA aparece mesmo fora da faixa de força do clube
+            foreach (var lid in new[] { "sa", "us" })
+            {
+                var L = League(lid);
+                if (L == null || MyClub.league == lid || !(p.fame >= L.MinFame + 5 && (p.age >= L.MinAge + 2 || p.fame >= 70))) continue;
+                if (!Rng.Chance(lid == "sa" ? .22 : .18)) continue;
+                var exotic = S.clubs.Where(c => c.league == lid && c.id != S.contract.club).OrderByDescending(c => c.str).Take(4).ToList();
+                if (exotic.Count > 0) cands.Insert(0, exotic[Rng.RangeInt(0, exotic.Count - 1)]);
+            }
             int n = Math.Min(4, 1 + (p.fame > 30 ? 1 : 0) + (se.forceExit ? 1 : 0) + (AvgRating >= 7 ? 1 : 0));
             var list = cands.Take(n).Select(c => MakeOffer(c, false)).ToList();
             if (p.coach >= 30 && o >= MyClub.str - 10) list.Insert(0, MakeOffer(MyClub, true));
@@ -484,7 +516,7 @@ namespace Camisa10.Core
             return list;
         }
 
-        public bool CanStartNextSeason => S.contract.years > 0;
+        public bool CanStartNextSeason => S.contract.years > 0 && !WorldCupActive;
         public bool MustRetire => S.player.age >= 38;
 
         public void NextSeason()

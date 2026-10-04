@@ -30,7 +30,7 @@ namespace Camisa10.EditorTools
         static int stage;
         static ChanceHud hud;
         static Chance3D chance;
-        static bool done;
+        static bool done, skillTried;
         static readonly List<string> report = new List<string>();
         static GameObject canvasGo;
 
@@ -69,6 +69,12 @@ namespace Camisa10.EditorTools
             float t = Time.time - stepAt;
             switch (stage)
             {
+                case 0 when t > 1.6f && System.Array.IndexOf(new[] { "chance", "cara", "contra", "meio" }, Types[index]) >= 0 && !skillTried:
+                    // com a bola nos pés: tenta uma firula antes de chutar
+                    skillTried = true;
+                    hud.Skill.OnPress?.Invoke();
+                    stepAt = Time.time + 1f;
+                    break;
                 case 0 when t > 1.6f:
                     // depois da apresentação: segura o chute (ou desarma, ou cabeceia na hora)
                     if (Types[index] == "defesa") hud.TackleL.OnPress?.Invoke();
@@ -96,7 +102,7 @@ namespace Camisa10.EditorTools
         {
             var game = Game.NewCareer("Teste", "ATA", new[] { 4, 4, 3, 3, 3, 3 });
             var match = new MatchEngine(game) { Current = new Moment { Type = Types[index], Text = "Teste automático", Options = new MomentOption[0] } };
-            done = false; stage = 0; stepAt = Time.time;
+            done = false; stage = 0; stepAt = Time.time; skillTried = false;
             hud = ChanceHud.Build(canvasGo.transform);
             string type = Types[index];
             chance = Chance3D.Play(null, game, match, hud, o => { done = true; report.Add($"ok  {type,-9} → {o}"); });

@@ -11,6 +11,9 @@ namespace Camisa10.Core
 
     public class FeedLine { public string Text; public FeedKind Kind; }
 
+    /// <summary>Uma ação do jogador na partida e quantos pontos ela valeu para a nota.</summary>
+    public class RatingAction { public int Minute, Points; public string Label; }
+
     public class MomentOption
     {
         public string Label, Kind; // goal | assist | follow | safe | tackle | contain | foul
@@ -37,16 +40,60 @@ namespace Camisa10.Core
         public Role Role;
         public int Gf, Ga, Goals, Assists, Minute;
         public float Rating = 6f;
+        /// <summary>Pontos das ações do jogador. Nota = 6,0 + pontos / 10 (entre 3 e 10).</summary>
+        public int Points;
+        public readonly List<RatingAction> Actions = new List<RatingAction>();
+
+        /// <summary>Tabela de pontos por ação (pedido do dono: drible +3, passe errado -2...).</summary>
+        public static class Pts
+        {
+            public const int Goal = 10, PenaltyGoal = 8, Assist = 7, KeyPass = 3, Pass = 2, Dribble = 3, Skill = 4, SkillHard = 5,
+                PenaltyWon = 4, ShotSaved = 1, Woodwork = 1, ShotWide = -1, Blocked = -1, PenaltyMiss = -6,
+                BadPass = -2, LostBall = -3, Tackle = 4, Contain = 2, Beaten = -3, Foul = -1, Yellow = -3, Red = -15,
+                Win = 3, Loss = -3, CleanSheet = 4;
+        }
+
+        /// <summary>Registra uma ação e recalcula a nota.</summary>
+        public void Score(string label, int pts)
+        {
+            Points += pts;
+            Actions.Add(new RatingAction { Minute = Minute, Points = pts, Label = label });
+            Rating = (float)Game.Clamp(Math.Round((6.0 + Points / 10.0) * 10) / 10.0, 3, 10);
+        }
+
+        /// <summary>Pontos e nome de um resultado de lance (o mesmo valor aparece na tela do lance).</summary>
+        public static (string label, int pts) OutcomePoints(LiveOutcome o, string type)
+        {
+            switch (o)
+            {
+                case LiveOutcome.Goal: return type == "penalti" ? ("Gol de pênalti", Pts.PenaltyGoal) : type == "cabeceio" ? ("Gol de cabeça", Pts.Goal) : ("Gol", Pts.Goal);
+                case LiveOutcome.Assist: return ("Assistência", Pts.Assist);
+                case LiveOutcome.Saved: return type == "penalti" ? ("Pênalti perdido", Pts.PenaltyMiss) : ("Chute no gol", Pts.ShotSaved);
+                case LiveOutcome.Missed: return type == "penalti" ? ("Pênalti perdido", Pts.PenaltyMiss) : ("Chute para fora", Pts.ShotWide);
+                case LiveOutcome.Blocked: return ("Chute bloqueado", Pts.Blocked);
+                case LiveOutcome.TeammateMissed: return ("Passe decisivo", Pts.KeyPass);
+                case LiveOutcome.PassIntercepted: return ("Passe errado", Pts.BadPass);
+                case LiveOutcome.LostBall: return ("Perdeu a bola", Pts.LostBall);
+                case LiveOutcome.TackleWon: return ("Desarme", Pts.Tackle);
+                case LiveOutcome.Beaten: return ("Foi driblado", Pts.Beaten);
+                case LiveOutcome.PenaltyWon: return ("Pênalti sofrido", Pts.PenaltyWon);
+                default: return ("", 0);
+            }
+        }
         public char Result;
         public Moment Current;
         public readonly List<FeedLine> Feed = new List<FeedLine>();
 
-        public MatchEngine(Game game)
+        /// <summary>Partida da liga (rodada atual do calendário).</summary>
+        public MatchEngine(Game game) : this(game, game.MyClub, game.CurrentFixture().opp, game.CurrentFixture().home,
+            game.S.season.role == Role.None ? game.ComputeRole() : game.S.season.role) { }
+
+        /// <summary>Partida avulsa (Copa do Mundo): times e papel do jogador definidos por quem chama.</summary>
+        public MatchEngine(Game game, Club my, Club opp, bool home, Role role)
         {
             g = game;
-            var f = g.CurrentFixture();
-            My = g.MyClub; Opp = f.opp; Home = f.home;
-            Role = g.S.season.role == Role.None ? g.ComputeRole() : g.S.season.role;
+            My = my; Opp = opp; Home = home;
+            Role = role;
 
             int inMin = -1, n = 0;
             if (Role == Role.Titular) { inMin = 0; n = 3; }
@@ -71,6 +118,8 @@ namespace Camisa10.Core
                 while (mins.Count < n) mins.Add(Rng.RangeInt(inMin + 3, 89));
                 foreach (int mm in mins) queue.Add(new Ev { m = mm, t = 'm' });
             }
+            // acréscimos dramáticos: às vezes a última bola do jogo é sua
+            if (Plays && Rng.Chance(.22)) queue.Add(new Ev { m = 90 + Rng.RangeInt(2, 6), t = 'd' });
             queue.Sort((a, b) => a.m != b.m ? a.m.CompareTo(b.m) : a.t == 'i' ? -1 : b.t == 'i' ? 1 : 0);
 
             Add(Home ? $"Apita o árbitro. {My.name} recebe o {Opp.name}." : $"Apita o árbitro. {My.name} visita o {Opp.name}.", FeedKind.Info);
@@ -97,6 +146,13 @@ namespace Camisa10.Core
                     case 'g': Gf++; GoalFlash = true; Add($"{e.m}' Gol do {My.name}! {GameData.Outfield(My.name)} marca.", FeedKind.TeamGoal); return StepResult.Continue;
                     case 'a': Ga++; Add($"{e.m}' Gol do {Opp.name}. {GameData.Outfield(Opp.name)} marca.", FeedKind.OppGoal); return StepResult.Continue;
                     case 'i': Add($"{e.m}' Substituição: você entra em campo.", FeedKind.Me); return StepResult.Continue;
+                    case 'd':
+                        // só vale se o jogo está empatado ou o time perde por um (é aí que dá frio na barriga)
+                        if (Sent || Gf - Ga > 0 || Ga - Gf > 1) continue;
+                        Add($"{e.m}' Acréscimos! O estádio inteiro de pé. A última bola pode ser sua...", FeedKind.Info);
+                        Current = Build(Rng.Chance(.35) ? "falta" : Rng.Chance(.3) ? "cabeceio" : "chance");
+                        Current.Text = Gf == Ga ? "ACRÉSCIMOS, jogo empatado: é a última chance de vencer!" : "ACRÉSCIMOS, perdendo por um: é a chance do empate!";
+                        return StepResult.AwaitChoice;
                     default:
                         if (Sent) continue;
                         Current = Build(Rng.Weighted(GameData.Positions[P.pos].Moments));
@@ -128,36 +184,36 @@ namespace Camisa10.Core
             switch (opt.Kind)
             {
                 case "goal":
-                    if (ok) { Gf++; Goals++; Rating += 1.1f; GoalFlash = true; Add($"{m}' GOL SEU! {(mo.Type == "cabeceio" ? "Cabeçada firme no canto!" : Rng.Pick(GoalTexts))}", FeedKind.TeamGoal); }
-                    else { Rating -= .15f; Add($"{m}' {Rng.Pick(MissTexts)}", FeedKind.Me); }
+                    if (ok) { Gf++; Goals++; Score("Gol", Pts.Goal); GoalFlash = true; Add($"{m}' GOL SEU! {(mo.Type == "cabeceio" ? "Cabeçada firme no canto!" : Rng.Pick(GoalTexts))}", FeedKind.TeamGoal); }
+                    else { Score("Finalização", Pts.ShotWide); Add($"{m}' {Rng.Pick(MissTexts)}", FeedKind.Me); }
                     break;
                 case "assist":
-                    if (ok) { Gf++; Assists++; Rating += .7f; GoalFlash = true; Add($"{m}' Gol do {My.name}! Assistência sua para {GameData.Outfield(My.name)}.", FeedKind.TeamGoal); }
-                    else if (Rng.Chance(.5)) { Rating -= .25f; Add($"{m}' O passe é interceptado.", FeedKind.Me); }
-                    else { Rating += .1f; Add($"{m}' Boa jogada sua, mas o companheiro desperdiça.", FeedKind.Me); }
+                    if (ok) { Gf++; Assists++; Score("Assistência", Pts.Assist); GoalFlash = true; Add($"{m}' Gol do {My.name}! Assistência sua para {GameData.Outfield(My.name)}.", FeedKind.TeamGoal); }
+                    else if (Rng.Chance(.5)) { Score("Passe errado", Pts.BadPass); Add($"{m}' O passe é interceptado.", FeedKind.Me); }
+                    else { Score("Passe decisivo", Pts.KeyPass); Add($"{m}' Boa jogada sua, mas o companheiro desperdiça.", FeedKind.Me); }
                     break;
                 case "follow":
-                    if (ok) { Rating += .3f; Add($"{m}' Você passa pela marcação!", FeedKind.Me); Current = Build("cara"); return true; }
-                    Rating -= .3f; Add($"{m}' Você perde a bola.", FeedKind.Me);
+                    if (ok) { Score("Drible", Pts.Dribble); Add($"{m}' Você passa pela marcação!", FeedKind.Me); Current = Build("cara"); return true; }
+                    Score("Perdeu a bola", Pts.LostBall); Add($"{m}' Você perde a bola.", FeedKind.Me);
                     break;
                 case "safe":
-                    if (ok) { Rating += .1f; Add($"{m}' Bola segura, o time respira.", FeedKind.Me); }
-                    else { Rating -= .15f; Add($"{m}' Você é desarmado.", FeedKind.Me); }
+                    if (ok) { Score("Passe certo", Pts.Pass); Add($"{m}' Bola segura, o time respira.", FeedKind.Me); }
+                    else { Score("Perdeu a bola", Pts.LostBall); Add($"{m}' Você é desarmado.", FeedKind.Me); }
                     break;
                 case "tackle":
-                    if (ok) { Rating += .5f; Add($"{m}' Desarme limpo!", FeedKind.Me); }
+                    if (ok) { Score("Desarme", Pts.Tackle); Add($"{m}' Desarme limpo!", FeedKind.Me); }
                     else
                     {
-                        Rating -= .4f;
+                        Score("Foi driblado", Pts.Beaten);
                         if (Rng.Chance(.45)) { Ga++; Add($"{m}' {GameData.Outfield(Opp.name)} passa por você e marca. Gol do {Opp.name}.", FeedKind.OppGoal); }
                         else Add($"{m}' Ele passa, mas o goleiro salva.", FeedKind.Me);
                     }
                     break;
                 case "contain":
-                    if (ok) { Rating += .3f; Add($"{m}' Você fecha o espaço e a jogada morre.", FeedKind.Me); }
+                    if (ok) { Score("Fechou o espaço", Pts.Contain); Add($"{m}' Você fecha o espaço e a jogada morre.", FeedKind.Me); }
                     else
                     {
-                        Rating -= .3f;
+                        Score("Foi driblado", Pts.Beaten);
                         if (Rng.Chance(.3)) { Ga++; Add($"{m}' A bola passa e o {Opp.name} marca.", FeedKind.OppGoal); }
                         else Add($"{m}' Ele finaliza, mas para fora.", FeedKind.Me);
                     }
@@ -165,10 +221,10 @@ namespace Camisa10.Core
                 case "foul":
                     if (Rng.Chance(.5))
                     {
-                        if (Yellow) { Sent = true; Rating -= 1.5f; Add($"{m}' Segundo amarelo. Você está expulso.", FeedKind.OppGoal); }
-                        else { Yellow = true; Rating -= .2f; Add($"{m}' Falta e cartão amarelo.", FeedKind.Me); }
+                        if (Yellow) { Sent = true; Score("Expulsão", Pts.Red); Add($"{m}' Segundo amarelo. Você está expulso.", FeedKind.OppGoal); }
+                        else { Yellow = true; Score("Cartão amarelo", Pts.Yellow); Add($"{m}' Falta e cartão amarelo.", FeedKind.Me); }
                     }
-                    else { Rating += .1f; Add($"{m}' Falta feita, jogada parada.", FeedKind.Me); }
+                    else { Score("Falta", Pts.Foul); Add($"{m}' Falta feita, jogada parada.", FeedKind.Me); }
                     break;
             }
             return false;
@@ -181,34 +237,33 @@ namespace Camisa10.Core
             var type = Current.Type;
             int m = Minute;
             Current = null; GoalFlash = false;
+            var (label, pts) = OutcomePoints(o, type);
+            if (pts != 0) Score(label, pts);
             switch (o)
             {
                 case LiveOutcome.Goal:
-                    Gf++; Goals++; Rating += 1.1f; GoalFlash = true;
+                    Gf++; Goals++; GoalFlash = true;
                     Add($"{m}' GOL SEU! {(type == "cabeceio" ? "Cabeçada firme no canto!" : type == "falta" ? "Cobrança perfeita!" : type == "penalti" ? "Pênalti batido com categoria!" : Rng.Pick(GoalTexts))}", FeedKind.TeamGoal);
                     break;
                 case LiveOutcome.PenaltyWon:
                     // a jogada continua: você mesmo vai para a cobrança
-                    Rating += .2f;
                     Add($"{m}' Pênalti! Você é derrubado dentro da área e vai para a bola.", FeedKind.Me);
                     Current = Build("penalti");
                     return;
                 case LiveOutcome.Assist:
-                    Gf++; Assists++; Rating += .7f; GoalFlash = true;
+                    Gf++; Assists++; GoalFlash = true;
                     Add($"{m}' Gol do {My.name}! Assistência sua para {GameData.Outfield(My.name)}.", FeedKind.TeamGoal);
                     break;
                 case LiveOutcome.Saved:
-                    Rating -= type == "penalti" ? .5f : .05f;
                     Add(type == "penalti" ? $"{m}' {GameData.Keeper(Opp.name)} defende o seu pênalti!" : $"{m}' Grande defesa de {GameData.Keeper(Opp.name)}, do {Opp.name}.", FeedKind.Me);
                     break;
-                case LiveOutcome.Missed: Rating -= type == "penalti" ? .6f : .2f; Add($"{m}' {(type == "cabeceio" ? "A cabeçada sai sem direção." : type == "penalti" ? "Você isola o pênalti!" : "O chute vai para fora.")}", FeedKind.Me); break;
-                case LiveOutcome.Blocked: Rating -= .1f; Add($"{m}' A defesa bloqueia o chute.", FeedKind.Me); break;
-                case LiveOutcome.TeammateMissed: Rating += .15f; Add($"{m}' Belo passe seu, mas o companheiro desperdiça.", FeedKind.Me); break;
-                case LiveOutcome.PassIntercepted: Rating -= .25f; Add($"{m}' O passe não chega.", FeedKind.Me); break;
-                case LiveOutcome.LostBall: Rating -= .3f; Add($"{m}' Você perde a bola.", FeedKind.Me); break;
-                case LiveOutcome.TackleWon: Rating += .5f; Add($"{m}' Desarme limpo!", FeedKind.Me); break;
+                case LiveOutcome.Missed: Add($"{m}' {(type == "cabeceio" ? "A cabeçada sai sem direção." : type == "penalti" ? "Você isola o pênalti!" : "O chute vai para fora.")}", FeedKind.Me); break;
+                case LiveOutcome.Blocked: Add($"{m}' A defesa bloqueia o chute.", FeedKind.Me); break;
+                case LiveOutcome.TeammateMissed: Add($"{m}' Belo passe seu, mas o companheiro desperdiça.", FeedKind.Me); break;
+                case LiveOutcome.PassIntercepted: Add($"{m}' O passe não chega.", FeedKind.Me); break;
+                case LiveOutcome.LostBall: Add($"{m}' Você perde a bola.", FeedKind.Me); break;
+                case LiveOutcome.TackleWon: Add($"{m}' Desarme limpo!", FeedKind.Me); break;
                 case LiveOutcome.Beaten:
-                    Rating -= .4f;
                     if (Rng.Chance(.45)) { Ga++; Add($"{m}' {GameData.Outfield(Opp.name)} passa por você e marca. Gol do {Opp.name}.", FeedKind.OppGoal); }
                     else Add($"{m}' Ele passa por você, mas o goleiro salva.", FeedKind.Me);
                     break;
@@ -221,9 +276,9 @@ namespace Camisa10.Core
             Minute = 90;
             if (Plays)
             {
-                Rating += Result == 'w' ? .3f : Result == 'l' ? -.3f : 0f;
-                if (Ga == 0 && g.IsDefensive) Rating += .4f;
-                Rating = (float)Game.Clamp(Math.Round(Rating * 10) / 10.0, 3, 10);
+                if (Result == 'w') Score("Vitória", Pts.Win);
+                else if (Result == 'l') Score("Derrota", Pts.Loss);
+                if (Ga == 0 && g.IsDefensive) Score("Sem sofrer gols", Pts.CleanSheet);
             }
             Add($"90' Fim de jogo: {My.name} {Gf} x {Ga} {Opp.name}.", FeedKind.Info);
             Done = true; GoalFlash = false;

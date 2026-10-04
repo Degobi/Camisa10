@@ -1,0 +1,13 @@
+Sons do jogo (gravações reais). Fonte: Mixkit (mixkit.co), "Sound Effects Free License".
+Arquivos cortados, normalizados e convertidos para mono 22 kHz. Antes de publicar na loja, confira a licença
+em mixkit.co/license (uso dentro de jogo é permitido; não redistribuir os arquivos soltos).
+
+torcida.wav  - Ambient sports crowd sound (2097), em laço
+gol.wav      - Huge crowd cheering victory (462)
+aplauso.wav  - Stadium crowd light applause (362)
+lamento.wav  - Crowd at the stadium (2111)
+vaia.wav     - Crowd disappointment long boo (463)
+chute.wav    - Soccer ball kick (2099)
+toque.wav    - Soccer ball quick kick (2108)
+apito.wav    - Police whistle (614)
+Para trocar um som, substitua o arquivo com o mesmo nome.

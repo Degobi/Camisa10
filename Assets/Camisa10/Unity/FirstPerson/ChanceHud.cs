@@ -291,7 +291,8 @@ namespace Camisa10.UI
 
         // ---------- controles na tela ----------
         public VirtualStick Stick;
-        public TouchButton Shoot, PassBtn, Dribble, Sprint, TackleL, TackleR;
+        public TouchButton Shoot, PassBtn, Dribble, Sprint, TackleL, TackleR, Skill;
+        Text skillHint;
         Image staminaFill, dribbleRing;
         GameObject stickGo;
 
@@ -354,6 +355,11 @@ namespace Camisa10.UI
             PassBtn = RoundButton(safe, "PASSE", Theme.Cyan, Theme.TurfInk, br, new Vector2(-480, 150), 150, 30);
             Dribble = RoundButton(safe, "DRIBLE", Theme.Gold, Theme.GoldInk, br, new Vector2(-450, 380), 150, 30);
             Sprint = RoundButton(safe, "CORRER", Theme.Purple, Color.white, br, new Vector2(-210, 480), 140, 28);
+            Skill = RoundButton(safe, "FIRULA", Theme.Hex("#FF7A1A"), Color.white, br, new Vector2(-690, 290), 150, 28);
+            skillHint = UIKit.Txt(Skill.transform, "", 20, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+            skillHint.rectTransform.anchorMin = new Vector2(.5f, 0); skillHint.rectTransform.anchorMax = new Vector2(.5f, 0);
+            skillHint.rectTransform.sizeDelta = new Vector2(220, 28); skillHint.rectTransform.anchoredPosition = new Vector2(0, -22);
+            skillHint.gameObject.AddComponent<Outline>().effectColor = new Color(0, 0, 0, .7f);
 
             dribbleRing = UIKit.Img(Dribble.transform, Theme.Gold, false, "Pronto");
             dribbleRing.sprite = UIKit.Circle; dribbleRing.raycastTarget = false;
@@ -381,6 +387,7 @@ namespace Camisa10.UI
         public void Controls(bool stick, bool shoot, bool pass, bool dribble, bool sprint, bool tackle)
         {
             stickGo.SetActive(stick);
+            Skill.gameObject.SetActive(stick); // firulas só com a bola nos pés
             Shoot.gameObject.SetActive(shoot);
             PassBtn.gameObject.SetActive(pass);
             Dribble.gameObject.SetActive(dribble);
@@ -390,6 +397,24 @@ namespace Camisa10.UI
         }
 
         public void HideControls() => Controls(false, false, false, false, false, false);
+
+        /// <summary>Nome da firula que sai agora (muda com a direção do joystick).</summary>
+        public void SkillName(string s) { if (skillHint.text != s) skillHint.text = s; }
+
+        // ---------- pontos da nota subindo na tela ----------
+        int popups;
+
+        /// <summary>"+3 DRIBLE": texto que sobe e some (pontos da nota da partida).</summary>
+        public void Popup(string text, Color color)
+        {
+            var t = UIKit.Txt(Root.transform, text, 54, color, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter);
+            var rt = t.rectTransform;
+            rt.anchorMin = rt.anchorMax = new Vector2(.5f, .62f);
+            rt.sizeDelta = new Vector2(900, 80);
+            rt.anchoredPosition = new Vector2(0, -(popups++ % 3) * 70);
+            var o = t.gameObject.AddComponent<Outline>(); o.effectColor = new Color(0, 0, 0, .75f); o.effectDistance = new Vector2(3, -3);
+            t.gameObject.AddComponent<FloatUp>();
+        }
 
         public void SetStamina(float v01)
         {
@@ -405,5 +430,22 @@ namespace Camisa10.UI
         }
 
         public void Destroy() { if (Root != null) Object.Destroy(Root); }
+    }
+
+    /// <summary>Sobe devagar e desaparece.</summary>
+    public class FloatUp : MonoBehaviour
+    {
+        float t;
+        Text txt;
+        void Awake() => txt = GetComponent<Text>();
+        void Update()
+        {
+            t += Time.deltaTime;
+            ((RectTransform)transform).anchoredPosition += new Vector2(0, 70 * Time.deltaTime);
+            float a = t < .15f ? t / .15f : Mathf.Clamp01(1.6f - t);
+            transform.localScale = Vector3.one * (t < .15f ? Mathf.Lerp(1.4f, 1f, t / .15f) : 1f);
+            if (txt != null) { var c = txt.color; c.a = a; txt.color = c; }
+            if (t > 1.6f) Destroy(gameObject);
+        }
     }
 }

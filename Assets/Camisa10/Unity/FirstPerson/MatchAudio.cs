@@ -44,17 +44,22 @@ namespace Camisa10.UI
             ambTarget = Mathf.MoveTowards(ambTarget, .32f, Time.deltaTime * .08f);
         }
 
-        public void Touch(float strength) => Play(kick, .25f + strength * .35f, 1.25f + Random.Range(-.08f, .08f));
+        public void Touch(float strength) => Play(Load("toque") ?? kick, .25f + strength * .35f, 1.15f + Random.Range(-.08f, .08f));
         public void Kick(float strength) => Play(Load("chute") ?? kick, .55f + strength * .45f, .9f + Random.Range(-.05f, .05f));
         public void Whistle() => Play(Load("apito") ?? whistle, .5f, 1f);
 
         public void Cheer(float amount)
         {
             ambTarget = .32f + amount * .3f;
-            Play(Load("gol") ?? cheer, .35f + amount * .55f, 1f);
+            // drible e desarme ganham aplauso; gol ganha a explosão da torcida
+            var applause = amount < .6f ? Load("aplauso") : null;
+            Play(applause ?? Load("gol") ?? cheer, applause != null ? .5f + amount * .5f : .35f + amount * .55f, 1f);
         }
 
         public void Groan() => Play(Load("lamento") ?? groan, .6f, 1f);
+
+        /// <summary>Vaia (perdeu a bola de bobeira, passe errado, foi driblado).</summary>
+        public void Boo() => Play(Load("vaia") ?? groan, .45f, 1f);
 
         void Play(AudioClip c, float vol, float pitch)
         {

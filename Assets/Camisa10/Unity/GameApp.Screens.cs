@@ -307,7 +307,7 @@ namespace Camisa10.UI
         void BuildSeasonEnd()
         {
             var se = game.S.season; var sm = se.summary; var st = se.stats; var p = game.S.player; var c = game.MyClub;
-            bool forced = game.MustRetire, expired = !game.CanStartNextSeason;
+            bool forced = game.MustRetire, expired = game.S.contract.years <= 0;
 
             var cols = UIKit.Cols(content);
             var a = UIKit.Tile(cols, $"Temporada {se.year} encerrada", Theme.Turf);
@@ -328,6 +328,8 @@ namespace Camisa10.UI
             }
             foreach (var t in sm.notes) UIKit.Body(mid, "• " + t);
 
+            if (game.S.wc != null && game.S.wc.year == se.year && game.S.wc.matches.Count > 0) WorldCupTile(cols);
+
             var f = UIKit.Tile(cols, "Seu futuro", Theme.Cyan);
             string txt = expired ? "Seu contrato terminou. Escolha uma proposta para continuar jogando."
                 : $"Você tem contrato com o {c.name} por mais {game.S.contract.years} temporada(s).";
@@ -344,7 +346,8 @@ namespace Camisa10.UI
                     tab = "home";
                     Commit(null, true);
                 });
-                next.interactable = !expired;
+                next.interactable = game.CanStartNextSeason;
+                if (game.WorldCupActive) UIKit.Muted(f, "Termine a Copa do Mundo antes de começar a próxima temporada.", 22);
             }
             if (p.age >= 34 || forced || (expired && game.S.offers.Count == 0))
                 UIKit.Ghost(f, "Encerrar a carreira", () => { game.S.retired = true; Commit(null, true); });
@@ -862,6 +865,29 @@ namespace Camisa10.UI
 
         static Color LifeColor(string cat) => cat == "Carro" ? Color.Lerp(Theme.Red, Theme.Card, .35f)
             : cat == "Casa" ? Color.Lerp(Theme.Cyan, Theme.Card, .45f) : Color.Lerp(Theme.Gold, Theme.Card, .4f);
+
+        /// <summary>Campanha da Seleção na Copa do Mundo, com a próxima partida para jogar.</summary>
+        void WorldCupTile(Transform cols)
+        {
+            var wc = game.S.wc;
+            var t = UIKit.Tile(cols, $"Copa do Mundo {wc.year}", Theme.Gold);
+            HeadRow(t, "Seleção Brasileira", wc.champion ? "CAMPEÃ" : wc.eliminated ? "ELIMINADA" : "EM DISPUTA",
+                wc.champion ? Theme.Gold : wc.eliminated ? Theme.Red : Theme.Turf, wc.champion ? Theme.GoldInk : Theme.TurfInk);
+            foreach (var w in wc.matches)
+            {
+                string res = w.played ? $"{w.gf} x {w.ga}" + (w.pens ? (w.won ? " (pên.)" : " (pên.)") : "") : "a jogar";
+                string me = w.played && w.myGoals > 0 ? $" · {w.myGoals} gol(s) seu(s)" : "";
+                UIKit.KV(t, $"{Game.WcStages[w.stage]} · {w.opp}", res + me);
+            }
+            if (wc.matches.Count > 0 && wc.matches[0].stage == 0 && game.S.wc.phase != "done")
+                UIKit.Muted(t, $"Pontos no grupo: {wc.groupPts}", 22);
+            var next = game.WcNext;
+            if (next != null)
+            {
+                UIKit.Primary(t, $"Jogar: Brasil x {next.opp}", StartWorldCupMatch);
+                UIKit.Ghost(t, "Simular o resto da Copa", () => { game.SimulateRestOfWorldCup(); Commit(game.S.wc.champion ? "O Brasil é campeão do mundo!" : "Copa simulada.", true); });
+            }
+        }
 
         void ResetCareer()
         {

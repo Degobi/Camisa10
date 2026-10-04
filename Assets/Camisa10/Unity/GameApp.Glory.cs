@@ -8,10 +8,11 @@ namespace Camisa10.UI
     // Sala de troféus, Bola de Ouro, conquistas e os blocos de artilharia, copa e seleção na Central.
     public partial class GameApp
     {
-        Image Trophy(Transform parent, bool gold, float h)
+        Image Trophy(Transform parent, bool gold, float h, string title = null)
         {
             var im = UIKit.Img(parent, Color.white, false, "Taca");
-            im.sprite = Procedural.TrophySprite(gold);
+            // troféu 3D com o formato da taça de verdade; sem ele, o desenho simples
+            im.sprite = TrophyStudio.Get(title != null ? TrophyStudio.KindFor(title) : gold ? "brasileirao" : "estrela") ?? Procedural.TrophySprite(gold);
             im.preserveAspect = true;
             UIKit.LE(im, h, h, prefW: h * .84f, minW: h * .84f);
             return im;
@@ -91,7 +92,7 @@ namespace Camisa10.UI
             UIKit.Txt(hc, S.titles.Count == 0 ? "Nenhum título ainda" : $"{S.titles.Count} título(s)", 40, Theme.Gold, FontStyle.Bold);
             UIKit.Muted(hc, $"{S.awards.Count} prêmio(s) individual(is) · {S.monthly.Count} craque do mês", 24);
             if (S.titles.Count == 0) UIKit.Muted(t, "Seja campeão da liga ou da copa para encher a estante.");
-            var grid = UIKit.Grid(t, new Vector2(225, 190), 3, 12);
+            var grid = UIKit.Grid(t, new Vector2(218, 230), 3, 12);
             foreach (var title in S.titles) TrophyCard(grid.transform, title, true);
             foreach (var award in S.awards) TrophyCard(grid.transform, award, false);
 
@@ -148,7 +149,7 @@ namespace Camisa10.UI
         {
             var card = UIKit.Img(parent, Theme.Alpha(title ? Theme.Gold : Theme.Chip, title ? .16f : .7f), true, "Trofeu");
             var v = UIKit.V(card.gameObject, 10, 4, TextAnchor.UpperCenter);
-            Trophy(card.transform, title, 100);
+            Trophy(card.transform, title, 140, text);
             var tx = UIKit.Txt(card.transform, text, 21, title ? Theme.Gold : Theme.Ink, FontStyle.Bold, TextAnchor.UpperCenter);
             tx.resizeTextForBestFit = true; tx.resizeTextMinSize = 14; tx.resizeTextMaxSize = 21;
             UIKit.LE(tx, 56, 56);

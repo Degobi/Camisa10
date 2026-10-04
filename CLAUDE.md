@@ -28,6 +28,15 @@ Não é gerenciador estilo Brasfoot: você controla um jogador, não um time.
   `SwipePad` e `TouchControls` (entrada), `ChanceHud` (HUD do lance, placar estilo TV e vinheta).
   Movimento em campo com aceleração e bote (`Chance3D.Steer`), e o `PersonRig` escolhe parado/andando/correndo pela
   velocidade medida: mova o Transform, não force a animação.
+- Nota da partida por ações (`MatchEngine.Score` e a tabela `MatchEngine.Pts`): nota = 6,0 + pontos ÷ 10, entre 3 e 10.
+  Toda ação nova do jogador (drible, firula, passe...) deve chamar `Score`, nunca mexer em `Rating` direto. No lance 3D use
+  `Chance3D.AddPoints` (soma e mostra "+3 DRIBLE"); o resultado final do lance entra por `MatchEngine.OutcomePoints`.
+- Firulas em `Chance3D.Skills` (pedalada, elástico, chapéu, caneta; o joystick escolhe). Rede em `GoalNet` (linhas finas,
+  estufa no gol). Bola com desenho real (icosaedro truncado) em `Arena.BallTexture` + malha própria `Arena.BallMesh`.
+- Ligas: Brasileirão, La Liga, Premier League, Serie A, Ligue 1, Süper Lig, Saudi Pro League e MLS (`GameData.Leagues`,
+  com copa, exigência de mercado e prestígio). Arábia e MLS só mandam proposta por convite/sondagem (evento ou fim de temporada).
+- Copa do Mundo (`Core/WorldCup.cs`): anos 2026, 2030...; convocado joga grupo + mata-mata no fim da temporada, partidas
+  jogáveis no 3D (`MatchEngine` aceita times avulsos). Troféus em 3D de metal: `Unity/Art/TrophyStudio` (mapa título → taça).
 - Som: `MatchAudio` é o som do lance (torcida, toque, chute, comemoração, lamento, apito); `Sfx` é o som global
   (rede, trave e o que tocar fora do lance). Não chame os dois para o mesmo evento.
 - Paisagem é garantida por `Landscape.cs` + `SafeArea.cs` (faixa 16:9 em telas mais altas que 4:3), pelo `CanvasScaler`
@@ -42,6 +51,8 @@ Não é gerenciador estilo Brasfoot: você controla um jogador, não um time.
   Não use o nome "FIFA". Publicar na loja com nomes reais exige licença: avise o dono antes de um build público.
 - Materiais 3D são criados a partir do material padrão de primitiva (`Arena.Mat`), para não sumir no build.
   Coisas que brilham (LED, refletores, céu) usam `Arena.Unlit` (shader de sprites, sempre incluído), nunca `_EMISSION`.
+- Sons reais da Mixkit em `Resources/Sons` (torcida, gol, aplauso, lamento, vaia, chute, toque, apito; ver o LEIA-ME de lá).
+  Antes de publicar na loja, confira a licença da Mixkit, como já é preciso fazer com os nomes reais.
 - **Arquivo real tem prioridade sobre o gerado por código** (o dono não quer arte desenhada por código):
   `Resources/Estadio/grama` e `torcida`, `Resources/Sons/<nome>` (crowd, roar, ooh, kick, post, net, whistle...),
   `Resources/Vida/<id do item>` (fotos da aba Vida), `Resources/Escudos`. O gerado só cobre a falta do arquivo.
@@ -50,7 +61,8 @@ Não é gerenciador estilo Brasfoot: você controla um jogador, não um time.
   modo online. Mudou o formato de forma incompatível? Suba `GameState.CurrentVersion` e migre em `Game.EnsureProfile`.
 
 ## Como validar mudanças
-1. Regras (Core): `cd Tools/Simulador && dotnet run -- 3` simula carreiras completas.
+1. Regras (Core): `cd Tools/Simulador && dotnet run -- 10 [semente]` joga carreiras inteiras (treino, eventos, partidas, Copas,
+   transferências) e mostra notas, ligas e títulos. Rode depois de mexer em regra/economia e compare com antes.
 2. Unity: com o MCP for Unity conectado, leia o Console, entre em Play e confira se não há erros vermelhos.
    Sem o editor aberto, fotografe o lance (dia e noite), os menus e exporte os sons em `Capturas/`:
    `Unity -batchmode -projectPath . -executeMethod Camisa10.EditorTools.Camisa10Preview.CaptureBatch -logFile -`

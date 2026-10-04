@@ -94,6 +94,19 @@ namespace Camisa10.Core
     [Serializable] public class CareerRecord { public int year, rank, apps, goals, assists; public string club, c1, c2; public float avg; }
     [Serializable] public class News { public string when, text; }
 
+    // ---------- Copa do Mundo ----------
+    [Serializable] public class WcMatch { public int stage; public string opp, c1, c2; public int gf, ga, myGoals; public bool played, pens, won; public float rating; }
+
+    [Serializable]
+    public class WorldCupState
+    {
+        public int year;
+        public string phase = "off"; // off | group | ko | done
+        public List<WcMatch> matches = new List<WcMatch>();
+        public int groupPts;
+        public bool champion, eliminated;
+    }
+
     [Serializable]
     public class GameState
     {
@@ -122,5 +135,8 @@ namespace Camisa10.Core
         public bool calledUp;
         public List<RankRow> ballon = new List<RankRow>(); // último ranking da Bola de Ouro
         public int ballonYear;
+        public WorldCupState wc = new WorldCupState();
+        public int worldCups; // Copas disputadas
+        public string interestLeague; // liga que mandou sondagem (garante proposta dela no fim da temporada)
     }
 }

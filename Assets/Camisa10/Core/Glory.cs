@@ -23,7 +23,7 @@ namespace Camisa10.Core
         public static readonly int[] NationalWeeks = { 6, 12 };
         public static readonly string[] CupStages = { "Oitavas de final", "Quartas de final", "Semifinal", "Final" };
 
-        public static string CupName(string league) => league == "br" ? "Copa do Brasil" : league == "ib" ? "Copa del Rey" : "FA Cup";
+        public static string CupName(string league) => League(league)?.Cup ?? "Copa Nacional";
 
         // clubes que entram só na copa (além dos clubes da liga)
         static readonly Dictionary<string, (string name, int str, string c1, string c2)[]> CupGuests = new Dictionary<string, (string, int, string, string)[]>
@@ -38,6 +38,8 @@ namespace Camisa10.Core
 
         public static readonly AchievementDef[] Achievements =
         {
+            new AchievementDef { Id = "copa_jogou", Name = "Disputou uma Copa do Mundo", Desc = "Seja convocado para uma Copa do Mundo.", Money = 50000, Fame = 5 },
+            new AchievementDef { Id = "copa_mundo", Name = "Campeão do Mundo", Desc = "Vença a Copa do Mundo com a Seleção.", Money = 500000, Fame = 12 },
             new AchievementDef { Id = "estreia", Name = "Estreia profissional", Desc = "Entre em campo pela primeira vez.", Money = 5000, Fame = 1 },
             new AchievementDef { Id = "primeiro_gol", Name = "O primeiro a gente nunca esquece", Desc = "Marque seu primeiro gol.", Money = 10000, Fame = 2 },
             new AchievementDef { Id = "hat_trick", Name = "Hat-trick", Desc = "Faça três gols no mesmo jogo.", Money = 30000, Fame = 3 },
@@ -257,7 +259,7 @@ namespace Camisa10.Core
             foreach (var c in S.clubs)
             {
                 if (!GameData.Squads.TryGetValue(c.name, out var squad) || squad.Length < 2) continue;
-                double lg = c.league == "br" ? -3 : 2;
+                double lg = League(c.league)?.Prestige ?? 0;
                 for (int i = 1; i <= Math.Min(2, squad.Length - 1); i++)
                 {
                     if (i == 2 && c.str < 84) break;
@@ -268,7 +270,7 @@ namespace Camisa10.Core
                 }
             }
             double mine = Ovr * .9 + (st.apps > 0 ? (avg - 6.8) * 6 : -6) + (st.goals + se.cupGoals) * .25 + sm.titles.Count * 3
-                + S.player.fame * .05 + (S.calledUp ? 2 : 0) + (L.Id == "br" ? -3 : 2);
+                + S.player.fame * .05 + (S.calledUp ? 2 : 0) + L.Prestige;
             rows.Add(new RankRow { name = S.player.name, club = MyClub.name, score = (float)mine, me = true });
             rows = rows.OrderByDescending(r => r.score).ToList();
             int pos = rows.FindIndex(r => r.me) + 1;

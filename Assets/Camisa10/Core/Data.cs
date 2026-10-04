@@ -51,8 +51,12 @@ namespace Camisa10.Core
         // ---------- ligas e clubes (todos fictícios) ----------
         public class LeagueDef
         {
-            public string Id, Name;
+            public string Id, Name, Country, Cup;
             public double WageMult, FameMult;
+            /// <summary>Para receber proposta: fama OU geral mínimos (0 = qualquer um). MinAge: ligas que preferem veteranos.</summary>
+            public float MinFame; public int MinOvr, MinAge;
+            /// <summary>Peso da liga na Bola de Ouro (Europa forte = +, mercados menores = -).</summary>
+            public double Prestige;
             public (string name, int str, string c1, string c2)[] Clubs;
         }
 
@@ -60,21 +64,46 @@ namespace Camisa10.Core
         // para atualizar transferências, edite só as listas abaixo. O primeiro nome de cada elenco é o goleiro.
         public static readonly LeagueDef[] Leagues =
         {
-            new LeagueDef { Id = "br", Name = "Brasileirão", WageMult = 1, FameMult = 1, Clubs = new[] {
+            new LeagueDef { Id = "br", Name = "Brasileirão", Country = "Brasil", Cup = "Copa do Brasil", WageMult = 1, FameMult = 1, Prestige = -3, Clubs = new[] {
                 ("Flamengo", 78, "#C8102E", "#111111"), ("Palmeiras", 77, "#006437", "#FFFFFF"), ("Botafogo", 74, "#111111", "#FFFFFF"),
                 ("Cruzeiro", 72, "#003DA5", "#FFFFFF"), ("Fluminense", 70, "#7A0026", "#00613C"), ("São Paulo", 68, "#FFFFFF", "#C8102E"),
                 ("Corinthians", 66, "#FFFFFF", "#111111"), ("Bahia", 63, "#0057B8", "#E30613"), ("Vasco da Gama", 60, "#111111", "#FFFFFF"),
                 ("Grêmio", 57, "#0D80BF", "#111111") } },
-            new LeagueDef { Id = "ib", Name = "La Liga", WageMult = 1.6, FameMult = 1.4, Clubs = new[] {
+            new LeagueDef { Id = "ib", Name = "La Liga", Country = "Espanha", Cup = "Copa del Rey", WageMult = 1.6, FameMult = 1.4, MinFame = 22, MinOvr = 68, Prestige = 2, Clubs = new[] {
                 ("Real Madrid", 87, "#FFFFFF", "#FEBE10"), ("Barcelona", 86, "#A50044", "#004D98"), ("Atlético de Madrid", 82, "#CB3524", "#FFFFFF"),
                 ("Athletic Bilbao", 77, "#EE2523", "#FFFFFF"), ("Villarreal", 76, "#FFE667", "#005187"), ("Real Betis", 74, "#00954C", "#FFFFFF"),
                 ("Real Sociedad", 73, "#0067B1", "#FFFFFF"), ("Sevilla", 70, "#FFFFFF", "#D71920"), ("Valencia", 68, "#FFFFFF", "#111111"),
                 ("Celta de Vigo", 66, "#8AC3EE", "#FFFFFF") } },
-            new LeagueDef { Id = "en", Name = "Premier League", WageMult = 2, FameMult = 1.6, Clubs = new[] {
+            new LeagueDef { Id = "en", Name = "Premier League", Country = "Inglaterra", Cup = "FA Cup", WageMult = 2, FameMult = 1.6, MinFame = 32, MinOvr = 72, Prestige = 2.5, Clubs = new[] {
                 ("Liverpool", 88, "#C8102E", "#FFFFFF"), ("Manchester City", 87, "#6CABDD", "#FFFFFF"), ("Arsenal", 87, "#EF0107", "#FFFFFF"),
                 ("Chelsea", 83, "#034694", "#FFFFFF"), ("Manchester United", 80, "#DA291C", "#111111"), ("Newcastle", 79, "#111111", "#FFFFFF"),
                 ("Tottenham", 78, "#FFFFFF", "#132257"), ("Aston Villa", 77, "#670E36", "#95BFE5"), ("Brighton", 73, "#0057B8", "#FFFFFF"),
                 ("West Ham", 70, "#7A263A", "#1BB1E7") } },
+            new LeagueDef { Id = "it", Name = "Serie A", Country = "Itália", Cup = "Coppa Italia", WageMult = 1.5, FameMult = 1.35, MinFame = 22, MinOvr = 68, Prestige = 1.5, Clubs = new[] {
+                ("Inter de Milão", 85, "#0068A8", "#111111"), ("Napoli", 84, "#12A0D7", "#FFFFFF"), ("Milan", 82, "#FB090B", "#111111"),
+                ("Juventus", 82, "#111111", "#FFFFFF"), ("Atalanta", 80, "#1E71B8", "#111111"), ("Roma", 80, "#8E1F2F", "#F0BC42"),
+                ("Lazio", 77, "#87D8F7", "#FFFFFF"), ("Fiorentina", 76, "#482E92", "#FFFFFF"), ("Bologna", 77, "#1A2F48", "#A21C26"),
+                ("Como", 74, "#1E5CA8", "#FFFFFF") } },
+            new LeagueDef { Id = "fr", Name = "Ligue 1", Country = "França", Cup = "Coupe de France", WageMult = 1.4, FameMult = 1.3, MinFame = 18, MinOvr = 66, Prestige = 1, Clubs = new[] {
+                ("Paris Saint-Germain", 87, "#004170", "#DA291C"), ("Olympique de Marseille", 78, "#FFFFFF", "#2FAEE0"), ("Monaco", 77, "#E51B22", "#FFFFFF"),
+                ("Lille", 76, "#E01E13", "#1B2A5B"), ("Lyon", 76, "#FFFFFF", "#1C2D6E"), ("Nice", 73, "#C8102E", "#111111"),
+                ("Lens", 74, "#FFD100", "#E30613"), ("Rennes", 72, "#E2001A", "#111111"), ("Strasbourg", 72, "#009FE3", "#FFFFFF"),
+                ("Nantes", 68, "#FCD405", "#008845") } },
+            new LeagueDef { Id = "tr", Name = "Süper Lig", Country = "Turquia", Cup = "Copa da Turquia", WageMult = 1.2, FameMult = 1.1, MinFame = 12, MinOvr = 63, Prestige = -1, Clubs = new[] {
+                ("Galatasaray", 79, "#A90432", "#FDB912"), ("Fenerbahçe", 78, "#002D72", "#FFED00"), ("Beşiktaş", 75, "#111111", "#FFFFFF"),
+                ("Trabzonspor", 72, "#7B1C33", "#00A5DB"), ("Başakşehir", 70, "#ED6B21", "#1C2D5A"), ("Samsunspor", 69, "#E30613", "#FFFFFF"),
+                ("Göztepe", 68, "#FFD100", "#E30613"), ("Kasımpaşa", 66, "#1C2D5A", "#FFFFFF"), ("Antalyaspor", 66, "#E30613", "#FFFFFF"),
+                ("Konyaspor", 66, "#00A651", "#FFFFFF") } },
+            new LeagueDef { Id = "sa", Name = "Saudi Pro League", Country = "Arábia Saudita", Cup = "Copa do Rei", WageMult = 2.8, FameMult = .8, MinFame = 30, MinOvr = 72, MinAge = 27, Prestige = -3, Clubs = new[] {
+                ("Al-Hilal", 81, "#005BAC", "#FFFFFF"), ("Al-Nassr", 80, "#FFE600", "#0033A0"), ("Al-Ittihad", 79, "#FFE500", "#111111"),
+                ("Al-Ahli", 78, "#00A859", "#FFFFFF"), ("Al-Qadsiah", 75, "#F47B20", "#111111"), ("Al-Ettifaq", 72, "#00843D", "#E2001A"),
+                ("Al-Shabab", 72, "#FFFFFF", "#111111"), ("Al-Taawoun", 70, "#FFD700", "#111111"), ("Al-Fateh", 67, "#003F87", "#FFFFFF"),
+                ("Al-Khaleej", 66, "#FFD700", "#00843D") } },
+            new LeagueDef { Id = "us", Name = "MLS", Country = "Estados Unidos", Cup = "US Open Cup", WageMult = 1.3, FameMult = 1.2, MinFame = 20, MinOvr = 64, MinAge = 26, Prestige = -2.5, Clubs = new[] {
+                ("Inter Miami", 76, "#F7B5CD", "#231F20"), ("LAFC", 75, "#111111", "#C39E6D"), ("LA Galaxy", 72, "#00245D", "#FFD200"),
+                ("Columbus Crew", 72, "#FEDD00", "#111111"), ("FC Cincinnati", 72, "#F05323", "#263B80"), ("Seattle Sounders", 71, "#5D9741", "#005595"),
+                ("Orlando City", 71, "#633492", "#FDE192"), ("Atlanta United", 70, "#80000A", "#221F1F"), ("New York City FC", 70, "#6CACE4", "#041E42"),
+                ("Toronto FC", 68, "#B81137", "#455560") } },
         };
 
         public static readonly Dictionary<string, string[]> Squads = new Dictionary<string, string[]>
@@ -99,6 +128,90 @@ namespace Camisa10.Core
             ["Sevilla"] = new[] { "Nyland", "Isaac Romero", "Rubén Vargas", "Saúl", "Agoumé" },
             ["Valencia"] = new[] { "Dimitrievski", "Hugo Duro", "Gayà", "Diego López", "Pepelu" },
             ["Celta de Vigo"] = new[] { "Radu", "Iago Aspas", "Borja Iglesias", "Bryan Zaragoza", "Mingueza" },
+            // seleções (Copa do Mundo)
+            ["Brasil"] = new[] { "Alisson", "Vinícius Júnior", "Raphinha", "Rodrygo", "Bruno Guimarães", "Marquinhos", "Estêvão" },
+            ["Argentina"] = new[] { "Emiliano Martínez", "Messi", "Julián Álvarez", "Lautaro Martínez", "Mac Allister", "Enzo Fernández" },
+            ["França"] = new[] { "Maignan", "Mbappé", "Dembélé", "Tchouaméni", "Olise", "Saliba" },
+            ["Espanha"] = new[] { "Unai Simón", "Lamine Yamal", "Pedri", "Rodri", "Nico Williams", "Dani Olmo" },
+            ["Inglaterra"] = new[] { "Pickford", "Harry Kane", "Bellingham", "Saka", "Declan Rice", "Foden" },
+            ["Portugal"] = new[] { "Diogo Costa", "Cristiano Ronaldo", "Bruno Fernandes", "Bernardo Silva", "Rafael Leão", "Vitinha" },
+            ["Alemanha"] = new[] { "Ter Stegen", "Musiala", "Wirtz", "Havertz", "Kimmich" },
+            ["Holanda"] = new[] { "Verbruggen", "Gakpo", "Van Dijk", "Frenkie de Jong", "Xavi Simons" },
+            ["Bélgica"] = new[] { "Courtois", "De Bruyne", "Doku", "Lukaku", "Trossard" },
+            ["Itália"] = new[] { "Donnarumma", "Retegui", "Barella", "Tonali", "Chiesa" },
+            ["Croácia"] = new[] { "Livaković", "Modrić", "Kramarić", "Gvardiol", "Kovačić" },
+            ["Uruguai"] = new[] { "Rochet", "Valverde", "Darwin Núñez", "Ronald Araújo", "Ugarte" },
+            ["Colômbia"] = new[] { "Camilo Vargas", "Luis Díaz", "James Rodríguez", "Jhon Durán", "Lerma" },
+            ["Marrocos"] = new[] { "Bono", "Hakimi", "Brahim Díaz", "En-Nesyri", "Amrabat" },
+            ["Noruega"] = new[] { "Nyland", "Haaland", "Ødegaard", "Sørloth" },
+            ["Suíça"] = new[] { "Kobel", "Xhaka", "Embolo", "Akanji" },
+            ["Dinamarca"] = new[] { "Schmeichel", "Højlund", "Eriksen", "Højbjerg" },
+            ["Japão"] = new[] { "Suzuki", "Kubo", "Mitoma", "Endo" },
+            ["Estados Unidos"] = new[] { "Matt Turner", "Pulisic", "McKennie", "Balogun" },
+            ["Senegal"] = new[] { "Édouard Mendy", "Sadio Mané", "Ismaïla Sarr", "Nicolas Jackson" },
+            ["México"] = new[] { "Malagón", "Raúl Jiménez", "Edson Álvarez", "Santiago Giménez" },
+            ["Equador"] = new[] { "Galíndez", "Moisés Caicedo", "Enner Valencia", "Hincapié" },
+            ["Coreia do Sul"] = new[] { "Jo Hyeon-woo", "Son Heung-min", "Lee Kang-in", "Kim Min-jae" },
+            ["Canadá"] = new[] { "Crépeau", "Alphonso Davies", "Jonathan David" },
+            ["Egito"] = new[] { "El-Shenawy", "Salah", "Marmoush" },
+            ["Austrália"] = new[] { "Mat Ryan", "Irvine", "Boyle" },
+            ["Gana"] = new[] { "Ati-Zigi", "Kudus", "Semenyo" },
+            ["Arábia Saudita"] = new[] { "Al-Owais", "Salem Al-Dawsari", "Al-Buraikan" },
+            // Serie A
+            ["Inter de Milão"] = new[] { "Sommer", "Lautaro Martínez", "Barella", "Çalhanoğlu", "Marcus Thuram", "Dimarco" },
+            ["Napoli"] = new[] { "Meret", "McTominay", "De Bruyne", "Højlund", "Politano", "Di Lorenzo" },
+            ["Milan"] = new[] { "Maignan", "Rafael Leão", "Pulisic", "Modrić", "Gimenez", "Fofana" },
+            ["Juventus"] = new[] { "Di Gregorio", "Vlahović", "Kenan Yıldız", "Jonathan David", "Bremer", "Locatelli" },
+            ["Atalanta"] = new[] { "Carnesecchi", "Lookman", "De Ketelaere", "Ederson", "Scamacca" },
+            ["Roma"] = new[] { "Svilar", "Dybala", "Pellegrini", "Dovbyk", "Koné", "Soulé" },
+            ["Lazio"] = new[] { "Provedel", "Zaccagni", "Castellanos", "Guendouzi", "Pedro" },
+            ["Fiorentina"] = new[] { "De Gea", "Moise Kean", "Gudmundsson", "Dzeko", "Mandragora" },
+            ["Bologna"] = new[] { "Skorupski", "Orsolini", "Castro", "Ferguson", "Bernardeschi" },
+            ["Como"] = new[] { "Butez", "Nico Paz", "Morata", "Da Cunha", "Perrone" },
+            // Ligue 1
+            ["Paris Saint-Germain"] = new[] { "Chevalier", "Dembélé", "Vitinha", "Kvaratskhelia", "Hakimi", "Marquinhos", "Doué" },
+            ["Olympique de Marseille"] = new[] { "Rulli", "Greenwood", "Aubameyang", "Rabiot", "Højbjerg" },
+            ["Monaco"] = new[] { "Köhn", "Pogba", "Golovin", "Minamino", "Akliouche" },
+            ["Lille"] = new[] { "Özer", "Giroud", "Haraldsson", "André", "Mukau" },
+            ["Lyon"] = new[] { "Lucas Perri", "Tolisso", "Malick Fofana", "Tessmann", "Mikautadze" },
+            ["Nice"] = new[] { "Bulka", "Moffi", "Boga", "Sanson", "Diop" },
+            ["Lens"] = new[] { "Risser", "Thauvin", "Saïd", "Sotoca", "Aguilar" },
+            ["Rennes"] = new[] { "Samba", "Kalimuendo", "Embolo", "Blas", "Lepaul" },
+            ["Strasbourg"] = new[] { "Petrović", "Emegha", "Panichelli", "Enciso", "Diarra" },
+            ["Nantes"] = new[] { "Lopes", "Abline", "Mohamed", "Lepenant", "Mwanga" },
+            // Süper Lig
+            ["Galatasaray"] = new[] { "Uğurcan Çakır", "Osimhen", "Icardi", "Leroy Sané", "Barış Alper Yılmaz", "Torreira" },
+            ["Fenerbahçe"] = new[] { "Ederson", "En-Nesyri", "Asensio", "Talisca", "Kerem Aktürkoğlu", "Fred" },
+            ["Beşiktaş"] = new[] { "Ersin Destanoğlu", "Rafa Silva", "Abraham", "Ndidi", "Orkun Kökçü" },
+            ["Trabzonspor"] = new[] { "Onana", "Nwakaeme", "Muçi", "Zubkov", "Savic" },
+            ["Başakşehir"] = new[] { "Muhammed Şengezer", "Piątek", "Bertuğ Yıldırım", "Kemen", "Shomurodov" },
+            ["Samsunspor"] = new[] { "Okan Kocuk", "Marius", "Holse", "Mouandilmadji" },
+            ["Göztepe"] = new[] { "Lis", "Juan", "Romulo", "Olaitan" },
+            ["Kasımpaşa"] = new[] { "Gianniotis", "Fall", "Winck", "Haris Hajradinović" },
+            ["Antalyaspor"] = new[] { "Abdullah Yiğiter", "Storm", "Van de Streek", "Sander van de Streek" },
+            ["Konyaspor"] = new[] { "Deniz Ertaş", "Umut Nayir", "Bardhi", "Jin-ho Jo" },
+            // Saudi Pro League
+            ["Al-Hilal"] = new[] { "Bono", "Rúben Neves", "Malcom", "Milinković-Savić", "Darwin Núñez", "Cancelo" },
+            ["Al-Nassr"] = new[] { "Bento", "Cristiano Ronaldo", "Sadio Mané", "João Félix", "Coman", "Brozović" },
+            ["Al-Ittihad"] = new[] { "Rajković", "Benzema", "Kanté", "Bergwijn", "Fabinho", "Moussa Diaby" },
+            ["Al-Ahli"] = new[] { "Mendy", "Mahrez", "Toney", "Kessié", "Galeno", "Demiral" },
+            ["Al-Qadsiah"] = new[] { "Casteels", "Quiñones", "Nacho", "Retegui", "Otávio" },
+            ["Al-Ettifaq"] = new[] { "Rodák", "Wijnaldum", "Moussa Dembélé", "Álvaro Medrán" },
+            ["Al-Shabab"] = new[] { "Grohe", "Carrasco", "Bonsu Baah", "Hamdallah" },
+            ["Al-Taawoun"] = new[] { "Mailson", "Musa Barrow", "Flávio", "Al-Ahmad" },
+            ["Al-Fateh"] = new[] { "Dmitrović", "Batna", "Vargas", "Bendebka" },
+            ["Al-Khaleej"] = new[] { "Moris", "Fortounis", "Masouras", "Kurdi" },
+            // MLS
+            ["Inter Miami"] = new[] { "Ustari", "Messi", "Luis Suárez", "De Paul", "Segovia", "Jordi Alba" },
+            ["LAFC"] = new[] { "Lloris", "Son Heung-min", "Bouanga", "Delgado", "Tillman" },
+            ["LA Galaxy"] = new[] { "Mićović", "Riqui Puig", "Paintsil", "Pec", "Reus" },
+            ["Columbus Crew"] = new[] { "Schulte", "Rossi", "Hernández", "Nagbe", "Arfsten" },
+            ["FC Cincinnati"] = new[] { "Celentano", "Evander", "Denkey", "Valenzuela" },
+            ["Seattle Sounders"] = new[] { "Frei", "Morris", "Rusnák", "De la Vega", "Roldan" },
+            ["Orlando City"] = new[] { "Gallese", "Muriel", "Ojeda", "Enrique", "McGuire" },
+            ["Atlanta United"] = new[] { "Guzan", "Almirón", "Latte Lath", "Slisz" },
+            ["New York City FC"] = new[] { "Freese", "Martínez", "Moralez", "Wolf", "Ojeda" },
+            ["Toronto FC"] = new[] { "Sean Johnson", "Bernardeschi", "Insigne", "Osorio" },
             ["Liverpool"] = new[] { "Alisson", "Salah", "Wirtz", "Van Dijk", "Gakpo", "Isak" },
             ["Manchester City"] = new[] { "Donnarumma", "Haaland", "Rodri", "Foden", "Doku", "Reijnders" },
             ["Arsenal"] = new[] { "Raya", "Saka", "Ødegaard", "Rice", "Gyökeres", "Martinelli" },

@@ -232,6 +232,7 @@ namespace Camisa10.UI
             hud.Pad.OnSwipe = OnSwipe;
             hud.PassBtn.OnPress = PassButton;
             hud.Dribble.OnPress = DribbleButton;
+            hud.Skill.OnPress = SkillButton;
             hud.TackleL.OnPress = () => TackleButton(-1);
             hud.TackleR.OnPress = () => TackleButton(1);
             hud.Controls(carry, type != "defesa", mate != null, pressers.Count > 0, carry, type == "defesa");
@@ -264,6 +265,21 @@ namespace Camisa10.UI
             var se = g.S.season;
             var brands = new List<string>();
             foreach (var d in g.S.activeSponsors) if (!brands.Contains(d.brand)) brands.Add(d.brand);
+            if (m.My.league == "wc")
+            {
+                // Copa do Mundo: estádio neutro à noite, placas do torneio
+                var boards = new List<StadiumArt.Board>();
+                void B(string t, string bg, string fg) => boards.Add(new StadiumArt.Board { Text = t, Bg = Theme.Hex(bg), Fg = Theme.Hex(fg) });
+                B($"COPA DO MUNDO {g.S.wc.year}", "#0A2342", "#F2C230");
+                B(m.My.name + " x " + m.Opp.name, "#111111", "#FFFFFF");
+                B("COPA DO MUNDO", "#7A0E2A", "#FFFFFF");
+                foreach (var bb in StadiumStyle.DefaultBoards(brands)) boards.Add(bb);
+                return new StadiumStyle
+                {
+                    Home1 = Theme.Hex(home.c1), Home2 = Theme.Hex(home.c2), Away1 = Theme.Hex(away.c1), Away2 = Theme.Hex(away.c2),
+                    Night = true, Seed = 2026, Boards = boards,
+                };
+            }
             return new StadiumStyle
             {
                 Home1 = Theme.Hex(home.c1), Home2 = Theme.Hex(home.c2),
@@ -348,6 +364,14 @@ namespace Camisa10.UI
             if (foot == null) return;
             var b = A.Ball.transform.position;
             float touch = Time.time - touchAt < .18f ? Mathf.Sin((Time.time - touchAt) / .18f * Mathf.PI) : 0;
+            if (Time.time < footCircleUntil)
+            {
+                // pedalada: o pé dá a volta por cima da bola
+                float a = (footCircleUntil - Time.time) / .3f * Mathf.PI * 2f;
+                foot.position = b + new Vector3(Mathf.Cos(a) * .22f, .5f + Mathf.Abs(Mathf.Sin(a)) * .08f, -.1f + Mathf.Sin(a) * .12f);
+                foot.rotation = Quaternion.Euler(10, Mathf.Cos(a) * 40f, 0);
+                return;
+            }
             if (carry && kickT < 0)
             {
                 // o pé acompanha o corpo e encosta na bola a cada toque
@@ -535,6 +559,7 @@ namespace Camisa10.UI
                 case Phase.Aim:
                     if (carry) CarryStep(dt);
                     if (phase == Phase.Aim) ShootingStep(dt);
+                    if (phase == Phase.Aim) SkillHintStep();
                     if (type == "cabeceio") CrossStep();
                     if (type == "defesa") DefenseStep(dt);
                     if (phase == Phase.Aim && Time.time - startTime > aimTimeout) Finish(LiveOutcome.LostBall, "DEMOROU DEMAIS");
@@ -644,7 +669,8 @@ namespace Camisa10.UI
             me.x = Mathf.Clamp(me.x, -26f, 26f);
             me.z = Mathf.Clamp(me.z, -45f, -5.5f);
 
-            // bola: rola na grama e perde velocidade
+            // bola: rola na grama e perde velocidade (durante a firula quem move a bola é a animação dela)
+            if (skillActive) { b = Flat(A.Ball.transform.position); goto afterBall; }
             ballVel *= Mathf.Exp(-.85f * dt);
             b += ballVel * dt;
             toBall = b - me; db = toBall.magnitude;
@@ -670,6 +696,7 @@ namespace Camisa10.UI
             if (Mathf.Abs(b.x) > 33f || b.z < -50f) { Finish(LiveOutcome.LostBall, "BOLA PARA FORA"); return; }
             b.z = Mathf.Min(b.z, -4.5f);
             RollBall(b, dt);
+            afterBall:
 
             CarryCamera(b, sprint, dt);
 
@@ -727,7 +754,7 @@ namespace Camisa10.UI
                 }
 
                 // bola solta longe do seu pé: quem chegar primeiro leva
-                if (dist < .6f && db > 1.5f) { Finish(LiveOutcome.LostBall, "TOQUE LONGO DEMAIS"); return; }
+                if (!skillActive && dist < .6f && db > 1.5f) { Finish(LiveOutcome.LostBall, "TOQUE LONGO DEMAIS"); return; }
 
                 Vector3 aim, face;
                 float speedCap = sp;
@@ -855,6 +882,7 @@ namespace Camisa10.UI
                 sfx?.Touch(.5f);
                 sfx?.Cheer(.35f);
                 hud.Banner(timing ? "QUE DRIBLE!" : "PASSOU!", Theme.FeedGold);
+                AddPoints("Drible", MatchEngine.Pts.Dribble);
                 StartCoroutine(HideBanner(.6f));
             }
             else if (Rng.Chance(.5)) Finish(LiveOutcome.LostBall, "DESARMADO");
@@ -919,6 +947,7 @@ namespace Camisa10.UI
             {
                 mateHasBall = true;
                 passFlight = false;
+                AddPoints("Passe certo", MatchEngine.Pts.Pass);
                 Mv(mate).vel *= .15f; // domina e para em cima da bola
                 A.Ball.isKinematic = true;
                 A.Ball.transform.position = Flat(mate.position) + mate.forward * .6f + Vector3.up * Arena.BallRadius;
@@ -980,6 +1009,7 @@ namespace Camisa10.UI
             {
                 var c = Cross(prevBall, b, 0);
                 bool inside = Mathf.Abs(c.x) < Arena.GoalHalfWidth - Arena.BallRadius && c.y < Arena.GoalHeight - Arena.BallRadius;
+                if (inside) A.NearNet?.Hit(new Vector3(c.x, Mathf.Min(c.y, 2f), 1.9f), A.Ball.linearVelocity.magnitude);
                 Finish(inside ? LiveOutcome.Goal : LiveOutcome.Missed);
                 return;
             }
@@ -1001,6 +1031,10 @@ namespace Camisa10.UI
             hud.ShowNow(false);
             hud.SetHint("");
             hud.Banner(customText ?? Label(o), Good(o) ? Theme.FeedGold : Color.white);
+            // os pontos do resultado entram na nota quando o lance volta para a partida; aqui só aparecem
+            var (pl, pp) = MatchEngine.OutcomePoints(o == LiveOutcome.Goal && mateShotFlight ? LiveOutcome.Assist : o, type);
+            if (pp != 0) hud.Popup((pp > 0 ? "+" : "") + pp + " " + pl.ToUpperInvariant(), pp > 0 ? Theme.Turf : Theme.Red);
+            if (o == LiveOutcome.LostBall || o == LiveOutcome.PassIntercepted) sfx?.Boo();
             if (Good(o)) sfx?.Cheer(o == LiveOutcome.TackleWon ? .5f : 1f);
             else if (o == LiveOutcome.Saved || o == LiveOutcome.Missed || o == LiveOutcome.Blocked || o == LiveOutcome.TeammateMissed) sfx?.Groan();
             if (o == LiveOutcome.Goal || o == LiveOutcome.Assist) { sfx?.Whistle(); Sfx.Play(Sfx.Kind.Net, .8f); GameSettings.Buzz(); }

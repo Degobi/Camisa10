@@ -39,6 +39,37 @@ namespace Camisa10.EditorTools
             File.WriteAllBytes(Path.Combine(dir, "placas.png"), atlas.EncodeToPNG());
             ExportSounds(Path.Combine(dir, "sons"));
             CaptureMenus(dir);
+            // vitrine dos troféus 3D numa imagem só
+            {
+                string[] kinds = { "copa_mundo", "brasileirao", "premier", "laliga", "seriea", "ligue1", "mls", "copa", "bola_ouro", "chuteira", "estrela", "ouro_alcas" };
+                var sheet = new Texture2D(256 * 6, 256 * 2, TextureFormat.RGBA32, false);
+                var bg = new Color32[sheet.width * sheet.height];
+                for (int i = 0; i < bg.Length; i++) bg[i] = new Color32(18, 26, 48, 255);
+                sheet.SetPixels32(bg);
+                for (int i = 0; i < kinds.Length; i++)
+                {
+                    var sp = TrophyStudio.Get(kinds[i]);
+                    if (sp == null) continue;
+                    var rt = RenderTexture.GetTemporary(256, 256, 0);
+                    Graphics.Blit(sp.texture, rt);
+                    var prevA = RenderTexture.active; RenderTexture.active = rt;
+                    var cell = new Texture2D(256, 256, TextureFormat.RGBA32, false);
+                    cell.ReadPixels(new Rect(0, 0, 256, 256), 0, 0); cell.Apply();
+                    RenderTexture.active = prevA; RenderTexture.ReleaseTemporary(rt);
+                    var px = cell.GetPixels();
+                    int ox = (i % 6) * 256, oy = (1 - i / 6) * 256;
+                    for (int y = 0; y < 256; y++)
+                        for (int x = 0; x < 256; x++)
+                        {
+                            var c = px[y * 256 + x];
+                            var b0 = sheet.GetPixel(ox + x, oy + y);
+                            sheet.SetPixel(ox + x, oy + y, Color.Lerp(b0, new Color(c.r, c.g, c.b, 1), c.a));
+                        }
+                    Object.DestroyImmediate(cell);
+                }
+                sheet.Apply();
+                File.WriteAllBytes(Path.Combine(dir, "trofeus.png"), sheet.EncodeToPNG());
+            }
             SaveTex(KitArt.Shirt(Kit.For("Palmeiras", "#006437", "#FFFFFF"), 27), Path.Combine(dir, "camisa-palmeiras.png"));
             SaveTex(KitArt.Shirt(Kit.For("Vasco da Gama", "#111111", "#FFFFFF"), 10), Path.Combine(dir, "camisa-vasco.png"));
             if (!string.IsNullOrEmpty(previous)) EditorSceneManager.OpenScene(previous);
@@ -55,6 +86,8 @@ namespace Camisa10.EditorTools
             t.GetMethod("BuildShell", flags).Invoke(app, null);
             var game = Camisa10.Core.Game.NewCareer("Gabriel Souza", "ATA", new[] { 4, 4, 3, 3, 3, 3 });
             game.S.owned.Add("carro1"); // mostra um item comprado na vitrine
+            game.S.titles.AddRange(new[] { "Campeão do Brasileirão 2026", "Campeão da Copa do Brasil 2026", "Campeão da Copa do Mundo 2026", "Campeão da Premier League 2028" });
+            game.S.awards.AddRange(new[] { "Bola de Ouro 2027", "Artilheiro do Brasileirão 2026 (21 gols)", "Craque do Brasileirão 2026" });
             t.GetField("game", flags).SetValue(app, game);
 
             var cam = new GameObject("CamMenus").AddComponent<Camera>();
@@ -67,7 +100,7 @@ namespace Camisa10.EditorTools
             canvas.planeDistance = 1;
             var scaler = go.GetComponentInChildren<UnityEngine.UI.CanvasScaler>();
 
-            foreach (var tab in new[] { "home", "player", "life", "settings" })
+            foreach (var tab in new[] { "home", "player", "life", "settings", "trophies" })
             {
                 t.GetField("tab", flags).SetValue(app, tab);
                 t.GetMethod("Render", flags).Invoke(app, new object[] { true });
@@ -189,6 +222,9 @@ namespace Camisa10.EditorTools
             Shot("4-jogador", mate.position + new Vector3(1.6f, 1.4f, 2.2f), mate.position + Vector3.up * 1f);
             Shot("5-uniformes", new Vector3(0, 1.5f, -66.5f), new Vector3(0, 1.1f, -60));
             Shot("5b-uniformes-perto", new Vector3(-4, 1.4f, -62.6f), new Vector3(-4, 1.15f, -60));
+            a.Ball.transform.position = new Vector3(-1.2f, Arena.BallRadius, -3.2f);
+            Shot("7-rede-bola", new Vector3(-1.6f, .55f, -4.4f), new Vector3(.8f, 1.1f, 1.5f));
+            a.Ball.transform.position = ball;
             Shot("6-mergulho", new Vector3(10, 1.4f, -64.5f), new Vector3(9.4f, .9f, -60));
 
             a.Cam.targetTexture = null;

@@ -44,6 +44,8 @@ namespace Camisa10.UI
         public Transform Root;
         public Camera Cam;
         public Rigidbody Ball;
+        /// <summary>Rede do gol do lance (estufa no gol).</summary>
+        public GoalNet NearNet;
         public bool Night { get; private set; }
 
         Light sceneLight;
@@ -138,28 +140,88 @@ namespace Camisa10.UI
         // ---------- texturas pequenas ----------
         static Texture2D ballTex, glowTex;
 
+        /// <summary>
+        /// Bola de futebol de verdade: 12 pentágonos e 20 hexágonos calculados na esfera (icosaedro truncado),
+        /// com costuras finas e gomos levemente "almofadados". Desenhada direto no mapa da esfera, sem distorção.
+        /// </summary>
         static Texture2D BallTexture()
         {
             if (ballTex != null) return ballTex;
-            int w = 512, h = 256;
-            ballTex = new Texture2D(w, h, TextureFormat.RGBA32, true) { hideFlags = HideFlags.DontUnloadUnusedAsset, wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear };
+            const int w = 1024, h = 512;
+            float phi = (1 + Mathf.Sqrt(5)) / 2, ip = 1 / phi;
+            var pent = new List<Vector3>();
+            foreach (var a in new[] { -1f, 1f })
+                foreach (var b in new[] { -phi, phi })
+                {
+                    pent.Add(new Vector3(0, a, b).normalized); pent.Add(new Vector3(a, b, 0).normalized); pent.Add(new Vector3(b, 0, a).normalized);
+                }
+            var hexes = new List<Vector3>();
+            foreach (var a in new[] { -1f, 1f }) foreach (var b in new[] { -1f, 1f }) foreach (var c in new[] { -1f, 1f }) hexes.Add(new Vector3(a, b, c).normalized);
+            foreach (var a in new[] { -1f, 1f })
+                foreach (var b in new[] { -1f, 1f })
+                {
+                    hexes.Add(new Vector3(0, a * phi, b * ip).normalized); hexes.Add(new Vector3(a * ip, 0, b * phi).normalized); hexes.Add(new Vector3(a * phi, b * ip, 0).normalized);
+                }
+            var centers = new List<Vector3>(pent); centers.AddRange(hexes);
+            ballTex = new Texture2D(w, h, TextureFormat.RGBA32, true) { hideFlags = HideFlags.DontUnloadUnusedAsset, wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, anisoLevel = 4 };
             var px = new Color32[w * h];
+            var white = new Color(.97f, .97f, .96f); var black = new Color(.07f, .07f, .09f); var seam = new Color(.35f, .36f, .4f);
             for (int y = 0; y < h; y++)
+            {
+                float lat = ((y + .5f) / h - .5f) * Mathf.PI;
                 for (int x = 0; x < w; x++)
                 {
-                    int row = y / 64;
-                    float cx = ((x + (row % 2) * 64) % 128) - 64, cy = (y % 64) - 32;
-                    float d = Mathf.Abs(cx) * .87f + Mathf.Abs(cy) * .5f;
-                    float panel = Mathf.Clamp01(22.5f - Mathf.Max(d, Mathf.Abs(cy)));
-                    float seam = Mathf.Clamp01(1.6f - Mathf.Abs(d - 44));
-                    float v = y / (float)h, shade = .94f + Mathf.Sin(v * Mathf.PI) * .06f;
-                    var c = Color.Lerp(new Color(.97f, .97f, .97f), new Color(.1f, .11f, .14f), panel);
-                    c = Color.Lerp(c, new Color(.72f, .74f, .78f), seam * (1 - panel)) * shade;
+                    float lon = (x + .5f) / w * Mathf.PI * 2;
+                    var d = new Vector3(Mathf.Cos(lat) * Mathf.Cos(lon), Mathf.Sin(lat), Mathf.Cos(lat) * Mathf.Sin(lon));
+                    float best = -2, second = -2; int bi = 0;
+                    for (int i = 0; i < centers.Count; i++)
+                    {
+                        float dot = Vector3.Dot(d, centers[i]);
+                        if (dot > best) { second = best; best = dot; bi = i; } else if (dot > second) second = dot;
+                    }
+                    float edge = (best - second) * 60f;                 // 0 na costura
+                    float pillow = Mathf.Clamp01(edge / 4f);            // gomo almofadado: escurece perto da costura
+                    var c = bi < 12 ? black : white;
+                    c *= Mathf.Lerp(.82f, 1f, Mathf.Sqrt(pillow));
+                    c = Color.Lerp(seam, c, Mathf.Clamp01(edge / .9f));
+                    c.a = 1;
                     px[y * w + x] = c;
                 }
+            }
             ballTex.SetPixels32(px);
             ballTex.Apply(true, true);
             return ballTex;
+        }
+
+        static Mesh ballMesh;
+
+        /// <summary>Esfera de raio 0,5 com UV em longitude (u) e latitude (v), casando com BallTexture.</summary>
+        static Mesh BallMesh()
+        {
+            if (ballMesh != null) return ballMesh;
+            const int Lon = 48, Lat = 32;
+            var v = new List<Vector3>(); var n = new List<Vector3>(); var uv = new List<Vector2>(); var t = new List<int>();
+            for (int j = 0; j <= Lat; j++)
+            {
+                float lat = (j / (float)Lat - .5f) * Mathf.PI;
+                for (int i = 0; i <= Lon; i++)
+                {
+                    float lon = i / (float)Lon * Mathf.PI * 2;
+                    var d = new Vector3(Mathf.Cos(lat) * Mathf.Cos(lon), Mathf.Sin(lat), Mathf.Cos(lat) * Mathf.Sin(lon));
+                    v.Add(d * .5f); n.Add(d); uv.Add(new Vector2(i / (float)Lon, j / (float)Lat));
+                }
+            }
+            for (int j = 0; j < Lat; j++)
+                for (int i = 0; i < Lon; i++)
+                {
+                    int a = j * (Lon + 1) + i, b = a + Lon + 1;
+                    t.Add(a); t.Add(b); t.Add(a + 1);
+                    t.Add(a + 1); t.Add(b); t.Add(b + 1);
+                }
+            ballMesh = new Mesh { name = "Bola", hideFlags = HideFlags.DontUnloadUnusedAsset };
+            ballMesh.SetVertices(v); ballMesh.SetNormals(n); ballMesh.SetUVs(0, uv); ballMesh.SetTriangles(t, 0);
+            ballMesh.RecalculateBounds();
+            return ballMesh;
         }
 
         /// <summary>Brilho redondo e suave (halo dos refletores à noite).</summary>
@@ -399,50 +461,28 @@ namespace Camisa10.UI
             Prim(PrimitiveType.Cylinder, Root, new Vector3(px, 1.25f, z), new Vector3(.12f, 1.25f, .12f), postMat, colliders).name = "TraveD";
             Prim(PrimitiveType.Cylinder, Root, new Vector3(0, GoalHeight + .06f, z), new Vector3(.12f, px, .12f), postMat, colliders, Quaternion.Euler(0, 0, 90)).name = "TraveTravessao";
 
-            // rede: teto inclinado até o fundo, malha de 15 cm, tudo numa malha só
-            var net = new MeshBuilder();
-            const float depthTop = 1.2f, depthBottom = 2.3f, step = .15f, thick = .013f;
+            // rede de fios finos (estufa quando a bola entra) e suportes no formato caixote
+            var net = GoalNet.Build(Root, z, back, Own(Unlit(Night ? new Color(.86f, .88f, .92f) : new Color(.93f, .94f, .96f))));
+            if (colliders) NearNet = net;
+            const float depth = 2.0f, backTop = 2.15f;
             Vector3 P(float x, float y, float d) => new Vector3(x, y, z + back * d);
-            for (float x = -GoalHalfWidth; x <= GoalHalfWidth + .01f; x += step)
-            {
-                net.Beam(P(x, GoalHeight, depthTop), P(x, 0, depthBottom), thick);   // fundo
-                net.Beam(P(x, GoalHeight, 0), P(x, GoalHeight, depthTop), thick);    // teto
-            }
-            for (float t = 0; t <= 1.001f; t += step / GoalHeight)
-            {
-                float y = Mathf.Lerp(GoalHeight, 0, t), d = Mathf.Lerp(depthTop, depthBottom, t);
-                net.Beam(P(-GoalHalfWidth, y, d), P(GoalHalfWidth, y, d), thick);
-                net.Beam(P(-px, y, 0), P(-px, y, d), thick);
-                net.Beam(P(px, y, 0), P(px, y, d), thick);
-            }
-            for (float d = step; d < depthTop; d += step)
-                net.Beam(P(-GoalHalfWidth, GoalHeight, d), P(GoalHalfWidth, GoalHeight, d), thick);
-            // verticais das laterais
-            for (float d = step; d < depthBottom; d += step)
-                foreach (var sx in new[] { -px, px })
-                {
-                    float topY = d <= depthTop ? GoalHeight : Mathf.Lerp(GoalHeight, 0, (d - depthTop) / (depthBottom - depthTop));
-                    net.Beam(P(sx, 0, d), P(sx, topY, d), thick);
-                }
-            Build(net, "Rede", Mat(new Color(.9f, .91f, .93f), .1f), true, false);
-
-            // suportes de trás
             var frame = new MeshBuilder();
             foreach (var sx in new[] { -px, px })
             {
-                frame.Beam(P(sx, GoalHeight, .05f), P(sx, GoalHeight, depthTop), .04f);
-                frame.Beam(P(sx, GoalHeight, depthTop), P(sx, 0, depthBottom), .04f);
-                frame.Beam(P(sx, .02f, 0), P(sx, .02f, depthBottom), .04f);
+                frame.Beam(P(sx, GoalHeight + .03f, .05f), P(sx, backTop, depth), .035f);   // do travessão ao fundo
+                frame.Beam(P(sx, backTop, depth), P(sx, 0, depth), .035f);                  // vertical do fundo
+                frame.Beam(P(sx, .02f, 0), P(sx, .02f, depth), .03f);                       // no chão
             }
-            frame.Beam(P(-px, .02f, depthBottom), P(px, .02f, depthBottom), .04f);
-            Build(frame, "SuporteRede", Mat(new Color(.85f, .86f, .88f), .5f));
+            frame.Beam(P(-px, backTop, depth), P(px, backTop, depth), .035f);
+            frame.Beam(P(-px, .02f, depth), P(px, .02f, depth), .03f);
+            Build(frame, "SuporteRede", Mat(new Color(.82f, .83f, .86f), .5f));
 
             if (colliders)
             {
                 // colisor invisível que segura a bola dentro da rede
                 var wall = new GameObject("RedeColisor");
                 wall.transform.SetParent(Root, false);
-                wall.transform.localPosition = new Vector3(0, 1.3f, z + back * (depthBottom - .3f));
+                wall.transform.localPosition = new Vector3(0, 1.2f, z + back * 1.9f);
                 wall.AddComponent<BoxCollider>().size = new Vector3(9, 2.8f, .3f);
             }
         }
@@ -645,8 +685,9 @@ namespace Camisa10.UI
         // ---------- bola ----------
         void BuildBall()
         {
-            var ball = Prim(PrimitiveType.Sphere, Root, new Vector3(0, BallRadius, -11), Vector3.one * BallRadius * 2, TexMat(BallTexture(), Vector2.one, .45f), true);
+            var ball = Prim(PrimitiveType.Sphere, Root, new Vector3(0, BallRadius, -11), Vector3.one * BallRadius * 2, TexMat(BallTexture(), Vector2.one, .62f), true);
             ball.name = "Bola";
+            ball.GetComponent<MeshFilter>().sharedMesh = BallMesh(); // UV em latitude/longitude exatas para o desenho da bola
             Ball = ball.AddComponent<Rigidbody>();
             Ball.mass = .43f;
             Ball.linearDamping = .05f;
