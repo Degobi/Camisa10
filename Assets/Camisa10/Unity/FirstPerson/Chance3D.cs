@@ -46,10 +46,13 @@ namespace Camisa10.UI
         float mateSpeed, passArrive;
         bool mateHasBall, passFlight, mateShotFlight;
 
-        // contra-ataque
-        bool running;
-        float runSpeed, chaserSpeed;
+        // condução da bola com o joystick (contra-ataque, cara a cara, chance e meio-campo)
+        bool carry, autoRun;
+        float carrySpeed, chaserSpeed, presserSpeed, stamina = 1, tackleCd, burstUntil, actCd;
+        Vector3 carryVel;
         Transform chaser;
+        readonly List<Transform> pressers = new List<Transform>();
+        readonly Dictionary<Transform, float> stunUntil = new Dictionary<Transform, float>();
 
         // cabeceio
         Vector3 headPoint;
@@ -109,8 +112,8 @@ namespace Camisa10.UI
                     keeperZ = -2.6f;
                     keeper.position = new Vector3(b.x * .3f, 0, keeperZ);
                     kMax += .3f;
-                    aimTimeout = 6;
-                    hint = "Cara a cara com o goleiro! Deslize para chutar e mire nos cantos.";
+                    carry = true; carrySpeed = 3.4f + Stat(Attr.Vel) * .02f; aimTimeout = 12;
+                    hint = "Cara a cara! Conduza com o joystick, toque em CHUTAR ou deslize o dedo para mirar no canto.";
                     break;
                 }
                 case "falta":
@@ -123,20 +126,21 @@ namespace Camisa10.UI
                         blockers.Add(A.Person("Barreira", oppShirt, oppShorts, wallC + perp * ((i - 1.5f) * .55f) + new Vector3(nearSide * .6f, 0, 0), 180));
                     wallJump = true;
                     keeper.position = new Vector3(-nearSide * .7f, 0, keeperZ);
-                    hint = "Falta! Curve o dedo para a bola contornar a barreira.";
+                    hint = "Falta! Deslize curvando o dedo para contornar a barreira, ou toque em CHUTAR.";
                     break;
                 }
                 case "contra":
                 {
                     var b = new Vector3(R(-8, 8), 0, -34);
                     PlaceBallAndCamera(b);
-                    running = true;
-                    runSpeed = 5.6f + Stat(Attr.Vel) * .035f;
+                    carry = true; autoRun = true;
+                    carrySpeed = 4.8f + Stat(Attr.Vel) * .03f;
                     float side = Rng.Chance(.5) ? 1 : -1;
-                    chaser = A.Person("Zagueiro", oppShirt, oppShorts, b + new Vector3(side * 5, 0, -1), 0);
-                    chaserSpeed = 6.4f + opp01 * 1.6f;
-                    aimTimeout = 99;
-                    hint = "Contra-ataque! Você está correndo com a bola. Chute antes que o zagueiro chegue.";
+                    chaser = A.Person("Zagueiro", oppShirt, oppShorts, b + new Vector3(side * 6, 0, -2.5f), 0);
+                    chaserSpeed = carrySpeed * (.92f + opp01 * .12f);
+                    pressers.Add(chaser);
+                    aimTimeout = 20;
+                    hint = "Contra-ataque! Segure CORRER para fugir do zagueiro e use DRIBLE quando ele chegar perto.";
                     break;
                 }
                 case "meio":
@@ -149,7 +153,9 @@ namespace Camisa10.UI
                     mateSpeed = 5.5f;
                     marker = A.Person("Zagueiro", oppShirt, oppShorts, mate.position + new Vector3(-side * 2, 0, 2), 180);
                     blockers.Add(A.Person("Zagueiro", oppShirt, oppShorts, new Vector3(b.x * .5f + R(-2, 2), 0, -22), 180));
-                    hint = "Deslize até o companheiro que está correndo para lançar. Se preferir, arrisque o chute de longe.";
+                    pressers.Add(blockers[blockers.Count - 1]);
+                    carry = true; carrySpeed = 3.6f + Stat(Attr.Vel) * .02f; aimTimeout = 16;
+                    hint = "Toque em PASSE para lançar o companheiro, ou conduza e arrisque o chute.";
                     break;
                 }
                 case "cabeceio":
@@ -161,7 +167,7 @@ namespace Camisa10.UI
                     crossLaunchAt = Time.time + .8f;
                     blockers.Add(A.Person("Zagueiro", oppShirt, oppShorts, new Vector3(headPoint.x + side * .9f, 0, headPoint.z + .8f), 180));
                     aimTimeout = 99;
-                    hint = "Escanteio! Quando aparecer AGORA, deslize em direção ao gol para cabecear.";
+                    hint = "Escanteio! Quando aparecer AGORA, toque em CABECEAR ou deslize para o canto.";
                     break;
                 }
                 case "defesa":
@@ -174,7 +180,7 @@ namespace Camisa10.UI
                     attackerSpeed = 5.5f + opp01 * 1.5f;
                     cutSide = Rng.Chance(.5) ? 1 : -1;
                     aimTimeout = 99;
-                    hint = "Ele vem para cima de você. Leia o corpo dele e deslize para o lado em que ele cortar, na hora certa.";
+                    hint = "Ele vem para cima de você. Leia o corpo dele e toque em DESARME do lado em que ele cortar.";
                     break;
                 }
                 default: // "chance" e qualquer outro tipo de finalização
@@ -188,12 +194,22 @@ namespace Camisa10.UI
                     mateTarget = new Vector3(side * R(2, 5), 0, -8);
                     mateSpeed = 4.5f;
                     marker = A.Person("Zagueiro", oppShirt, oppShorts, mate.position + new Vector3(-side * 1.5f, 0, 1.5f), 180);
-                    hint = "Deslize em direção ao gol para chutar, ou para o companheiro para passar. Curve o dedo para dar efeito.";
+                    pressers.Add(blockers[0]);
+                    carry = true; carrySpeed = 3.4f + Stat(Attr.Vel) * .02f; aimTimeout = 14;
+                    hint = "Conduza com o joystick e drible o zagueiro. CHUTAR ou deslize o dedo para mirar; PASSE para o companheiro.";
                     break;
                 }
             }
+            presserSpeed = 2.8f + opp01 * 1.3f;
             hud.SetHint(hint);
             hud.Pad.OnSwipe = OnSwipe;
+            hud.Shoot.OnPress = ShootButton;
+            hud.PassBtn.OnPress = PassButton;
+            hud.Dribble.OnPress = DribbleButton;
+            hud.TackleL.OnPress = () => TackleButton(-1);
+            hud.TackleR.OnPress = () => TackleButton(1);
+            hud.Controls(carry, type != "defesa", mate != null, pressers.Count > 0, carry, type == "defesa");
+            if (type == "cabeceio") hud.Shoot.GetComponentInChildren<UnityEngine.UI.Text>().text = "CABECEAR";
             foreach (var bl in blockers) Rig(bl).Set(wallJump ? PersonRig.Mode.Idle : PersonRig.Mode.Ready);
             if (type != "defesa" && type != "cabeceio") CreateFoot();
 
@@ -297,7 +313,8 @@ namespace Camisa10.UI
             target.y += (float)Rng.Gauss() * sigma * .7f;
             float speed = Mathf.Lerp(13f, 21f + Stat(Attr.Fis) * .12f, power01) * powerScale;
             curveAccel = Mathf.Clamp(bend / (Mathf.Min(Screen.width, Screen.height) * .12f), -1f, 1f) * (3f + Stat(Attr.Dri) * .05f);
-            running = false;
+            carry = false;
+            hud.HideControls();
             kickT = 0;
             foreach (var bl in blockers) if (wallJump) Rig(bl).Set(PersonRig.Mode.Jump);
             Launch(start, target, speed);
@@ -317,6 +334,8 @@ namespace Camisa10.UI
             passFlight = true;
             mateTarget = Flat(target);
             passArrive = Time.time + Mathf.Max(.25f, HorizDist(start, target) / speed);
+            carry = false;
+            hud.HideControls();
             kickT = 0;
             Launch(start, target, speed);
             shotTime = Time.time;
@@ -338,7 +357,11 @@ namespace Camisa10.UI
         void DefenseSwipe(SwipeData s)
         {
             float dx = s.End.x - s.Start.x;
-            int side = Mathf.Abs(dx) < 40f ? 0 : (dx > 0 ? 1 : -1) * (A.Cam.transform.right.x >= 0 ? 1 : -1);
+            DefenseTry(Mathf.Abs(dx) < 40f ? 0 : (dx > 0 ? 1 : -1) * (A.Cam.transform.right.x >= 0 ? 1 : -1));
+        }
+
+        void DefenseTry(int side)
+        {
             float d = meZ - attacker.position.z, bonus = Stat(Attr.Def) * .004f;
             bool win;
             if (cutStart < 0) win = d <= 6f && side == cutSide && Rng.Chance(.55 + bonus);
@@ -385,7 +408,7 @@ namespace Camisa10.UI
             switch (phase)
             {
                 case Phase.Aim:
-                    if (running) RunStep(dt);
+                    if (carry) CarryStep(dt);
                     if (type == "cabeceio") CrossStep();
                     if (type == "defesa") DefenseStep(dt);
                     if (phase == Phase.Aim && Time.time - startTime > aimTimeout) Finish(LiveOutcome.LostBall, "DEMOROU DEMAIS");
@@ -424,7 +447,11 @@ namespace Camisa10.UI
         {
             if (mate != null) Rig(mate).Set(mateHasBall || HorizDist(mate.position, mateTarget) < .05f ? PersonRig.Mode.Idle : PersonRig.Mode.Run, mateSpeed);
             if (marker != null) Rig(marker).Set(PersonRig.Mode.Run, 4.2f);
-            if (chaser != null) Rig(chaser).Set(phase == Phase.Aim ? PersonRig.Mode.Run : PersonRig.Mode.Idle, chaserSpeed);
+            foreach (var d in pressers)
+            {
+                bool stunned = stunUntil.TryGetValue(d, out var until) && Time.time < until;
+                Rig(d).Set(stunned ? PersonRig.Mode.Stumble : phase == Phase.Aim && carry ? PersonRig.Mode.Run : PersonRig.Mode.Ready, d == chaser ? chaserSpeed : presserSpeed);
+            }
             if (attacker != null && (phase == Phase.Aim || attackerRunsOn)) Rig(attacker).Set(PersonRig.Mode.Run, attackerSpeed);
             if (phase == Phase.Aim) PlaceFoot();
         }
@@ -443,24 +470,145 @@ namespace Camisa10.UI
             A.Cam.transform.rotation = Quaternion.Slerp(A.Cam.transform.rotation, rot, 3f * dt);
         }
 
-        void RunStep(float dt)
+        // ---------- condução com o joystick ----------
+        bool CanAct() => phase == Phase.Aim && Time.time >= introUntil && Time.time >= actCd;
+
+        void CarryStep(float dt)
         {
-            var b = A.Ball.transform.position;
-            var dir = Flat(new Vector3(b.x * .6f, 0, -8f) - b).normalized;
-            if (b.z < -9.5f) { b += dir * runSpeed * dt; SetBall(b); }
-            var eye = b - dir * 2f + Vector3.up * (1.6f + Mathf.Sin(Time.time * 12f) * .04f);
-            A.PlaceCamera(eye, new Vector3(0, .9f, 0));
+            if (Time.time < introUntil) return;
+            var b = Flat(A.Ball.transform.position);
+            Vector2 st = hud.Stick.Value;
+            bool sprint = hud.Sprint.Held && stamina > .02f;
+            stamina = Mathf.Clamp01(stamina + (sprint ? -.42f : .16f) * dt);
+            hud.SetStamina(stamina);
 
-            chaser.position = Vector3.MoveTowards(chaser.position, Flat(b), chaserSpeed * dt);
-            Face(chaser, b);
-            if (HorizDist(chaser.position, b) < 1f) { Finish(LiveOutcome.LostBall); return; }
+            // o joystick é relativo à câmera, que sempre olha para o gol: para cima = em direção ao gol
+            var want = new Vector3(st.x, 0, st.y);
+            if (autoRun) want.z = Mathf.Max(want.z, .45f);
+            if (want.sqrMagnitude > 1f) want.Normalize();
+            float speed = carrySpeed * (sprint ? 1.4f : 1f) * (Time.time < burstUntil ? 1.35f : 1f);
+            carryVel = Vector3.Lerp(carryVel, want * speed, 1f - Mathf.Exp(-7f * dt));
+            b += carryVel * dt;
+            b.x = Mathf.Clamp(b.x, -26f, 26f);
+            b.z = Mathf.Clamp(b.z, -45f, -5.5f);
 
-            if (b.z > -17f)
+            // a bola vai alguns passos à frente, como na condução de verdade
+            float touch = carryVel.magnitude > .5f ? Mathf.Abs(Mathf.Sin(Time.time * 7f)) * .35f : 0;
+            var ballPos = b + (carryVel.sqrMagnitude > .01f ? carryVel.normalized : Vector3.forward) * (.15f + touch);
+            SetBall(ballPos);
+            var toGoal = Flat(new Vector3(0, 0, 0) - b).normalized;
+            var eye = b - toGoal * 2.3f + Vector3.up * (1.62f + (carryVel.magnitude > 1 ? Mathf.Sin(Time.time * 12f) * .03f : 0));
+            A.PlaceCamera(eye, new Vector3(b.x * .35f, .9f, 0));
+
+            // marcadores: correm para cortar o caminho; o carrinho tem chance, não é certeiro
+            tackleCd -= dt;
+            float nearest = 99;
+            foreach (var d in pressers)
             {
-                keeper.position = Vector3.MoveTowards(keeper.position, new Vector3(b.x * .45f, 0, -3.5f), 3f * dt);
-                keeperZ = keeper.position.z;
-                if (HorizDist(keeper.position, b) < 1.3f) Finish(LiveOutcome.Saved, "O GOLEIRO FICOU COM ELA");
+                if (d == null) continue;
+                bool stunned = stunUntil.TryGetValue(d, out var until) && Time.time < until;
+                float dist = HorizDist(d.position, b);
+                if (!stunned) nearest = Mathf.Min(nearest, dist);
+                if (stunned) continue;
+                var target = b + carryVel * .35f;
+                float sp = d == chaser ? chaserSpeed : presserSpeed;
+                d.position = Vector3.MoveTowards(d.position, Flat(target), sp * dt);
+                Face(d, b);
+                if (dist < 1.05f && tackleCd <= 0)
+                {
+                    tackleCd = .9f;
+                    float p = Mathf.Clamp(.4f + opp01 * .2f - (Stat(Attr.Dri) - 50) * .006f - (sprint ? 0 : .05f), .12f, .65f);
+                    if (Rng.Chance(p)) { Finish(LiveOutcome.LostBall, "DESARMADO"); return; }
+                    stunUntil[d] = Time.time + .7f; // errou o bote
+                }
             }
+            hud.DribbleReady(nearest < 3.2f);
+
+            // o goleiro sai do gol quando você entra na área
+            if (b.z > -16f)
+            {
+                keeper.position = Vector3.MoveTowards(keeper.position, new Vector3(b.x * .5f, 0, Mathf.Max(b.z + 2.2f, -5f)), (2.6f + opp01 * 1.2f) * dt);
+                Face(keeper, b);
+                keeperZ = keeper.position.z;
+                if (HorizDist(keeper.position, b) < 1.15f) Finish(LiveOutcome.Saved, "O GOLEIRO FICOU COM ELA");
+            }
+        }
+
+        void ShootButton()
+        {
+            if (!CanAct()) return;
+            if (type == "cabeceio") { HeaderButton(); return; }
+            if (type == "defesa") return;
+            float kx = keeper.position.x;
+            float side = Mathf.Abs(kx) < .3f ? (Rng.Chance(.5) ? 1 : -1) : (kx > 0 ? -1 : 1);
+            var target = new Vector3(side * R(2.2f, 3.0f), R(.35f, 1.7f), 0);
+            float bend = 0;
+            if (type == "falta")
+            {
+                // por cima e com efeito para dentro, contornando a barreira
+                target = new Vector3(side * R(3.2f, 4f), R(1.7f, 2.2f), 0);
+                bend = -side * Mathf.Min(Screen.width, Screen.height) * .08f;
+            }
+            Shot(target, .62f, bend, Stat(Attr.Fin), 1f);
+        }
+
+        void HeaderButton()
+        {
+            if (!crossLaunched || Time.time < windowOpen - .05f) { Finish(LiveOutcome.Missed, "FORA DO TEMPO"); return; }
+            if (Time.time > windowClose) return;
+            A.Ball.isKinematic = true;
+            A.Ball.transform.position = headPoint;
+            float side = keeper.position.x > 0 ? -1 : 1;
+            Shot(new Vector3(side * R(2f, 3f), R(.3f, 1.2f), 0), .5f, 0, (Stat(Attr.Fin) + Stat(Attr.Fis)) / 2f, .72f);
+        }
+
+        void PassButton()
+        {
+            if (!CanAct() || mate == null) return;
+            var run = Flat(mateTarget - mate.position);
+            var lead = Flat(mate.position) + (run.sqrMagnitude > .01f ? run.normalized * Mathf.Min(3.5f, run.magnitude) : Vector3.zero);
+            Pass(lead, .5f);
+        }
+
+        void DribbleButton()
+        {
+            if (!CanAct() || !carry) return;
+            actCd = Time.time + .45f;
+            var b = Flat(A.Ball.transform.position);
+            Transform near = null; float nd = 3.2f;
+            foreach (var d in pressers)
+            {
+                if (d == null || (stunUntil.TryGetValue(d, out var u) && Time.time < u)) continue;
+                float dist = HorizDist(d.position, b);
+                if (dist < nd) { nd = dist; near = d; }
+            }
+            burstUntil = Time.time + .5f;
+            if (near == null) return; // sem marcador perto: só uma arrancada
+            float p = Mathf.Clamp(.52f + (Stat(Attr.Dri) - 60) * .011f - opp01 * .18f, .25f, .88f);
+            if (Rng.Chance(p))
+            {
+                stunUntil[near] = Time.time + 1.6f;
+                // corte para o lado contrário ao marcador
+                float away = Mathf.Sign(b.x - near.position.x);
+                if (away == 0) away = 1;
+                carryVel += new Vector3(away * 4.5f, 0, 1.5f);
+                hud.Banner("PASSOU!", Theme.FeedGold);
+                StartCoroutine(HideBanner(.6f));
+            }
+            else if (Rng.Chance(.5)) Finish(LiveOutcome.LostBall, "DESARMADO");
+            else tackleCd = Mathf.Max(tackleCd, .3f);
+        }
+
+        IEnumerator HideBanner(float t)
+        {
+            yield return new WaitForSeconds(t);
+            if (phase == Phase.Aim) hud.EndBanner();
+        }
+
+        void TackleButton(int screenSide)
+        {
+            if (!CanAct() || type != "defesa") return;
+            DefenseTry(screenSide * (A.Cam.transform.right.x >= 0 ? 1 : -1));
         }
 
         void CrossStep()
@@ -616,6 +764,8 @@ namespace Camisa10.UI
             if (phase == Phase.Done) return;
             if (mateShotFlight) o = o == LiveOutcome.Goal ? LiveOutcome.Assist : LiveOutcome.TeammateMissed;
             phase = Phase.Done;
+            hud.HideControls();
+            hud.DribbleReady(false);
             hud.ShowNow(false);
             hud.SetHint("");
             hud.Banner(customText ?? Label(o), Good(o) ? Theme.FeedGold : Color.white);
