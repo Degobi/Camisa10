@@ -684,6 +684,7 @@ namespace Camisa10.UI
                     if (type != "defesa") FollowBall(dt);
                     break;
             }
+            RecordFrame();
         }
 
         Vector3 footAnchor;
@@ -1229,6 +1230,7 @@ namespace Camisa10.UI
             if (Good(o)) sfx?.Cheer(o == LiveOutcome.TackleWon ? .5f : 1f);
             else if (o == LiveOutcome.Saved || o == LiveOutcome.Missed || o == LiveOutcome.Blocked || o == LiveOutcome.TeammateMissed) sfx?.Groan();
             if (o == LiveOutcome.Goal || o == LiveOutcome.Assist) { sfx?.Whistle(); Sfx.Play(Sfx.Kind.Net, .8f); GameSettings.Buzz(); }
+            if (o == LiveOutcome.Goal) recEnd = Time.time + .9f; // o replay mostra a bola entrando e a rede estufando
             if (o == LiveOutcome.Goal || o == LiveOutcome.Assist)
             {
                 if (mate != null) Rig(mate).Set(PersonRig.Mode.Celebrate);
@@ -1316,7 +1318,11 @@ namespace Camisa10.UI
         IEnumerator End(LiveOutcome o)
         {
             // gol seu: comemoração em terceira pessoa (o passe para o gol do companheiro só tem o grito)
-            if (o == LiveOutcome.Goal && !defending) yield return Celebration();
+            if (o == LiveOutcome.Goal && !defending)
+            {
+                if (CanReplay) { yield return new WaitForSeconds(1.1f); yield return Replay(); }
+                yield return Celebration();
+            }
             else yield return new WaitForSeconds(1.9f);
             var cb = onDone;
             onDone = null;
@@ -1325,6 +1331,7 @@ namespace Camisa10.UI
 
         void OnDestroy()
         {
+            Time.timeScale = 1f; // nunca deixa o jogo em câmera lenta
             if (A != null) A.Destroy();
             A = null;
         }

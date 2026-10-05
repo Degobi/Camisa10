@@ -27,7 +27,7 @@ namespace Camisa10.UI
 
         IEnumerator Celebration()
         {
-            yield return new WaitForSeconds(1.0f); // a bola na rede e o grito de gol primeiro
+            yield return new WaitForSeconds(replayed ? .15f : 1.0f); // a bola na rede e o grito de gol primeiro (depois do replay, direto)
             celebrating = true;
             skipCelebration = false;
             hud.EndBanner();

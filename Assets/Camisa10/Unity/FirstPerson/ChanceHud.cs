@@ -228,6 +228,16 @@ namespace Camisa10.UI
             h.banner.resizeTextForBestFit = true; h.banner.resizeTextMinSize = 40; h.banner.resizeTextMaxSize = 110;
             h.bannerBg.gameObject.SetActive(false);
 
+            // selo de replay no canto, como na transmissão
+            h.replayTag = UIKit.Img(safe, Theme.Red, true, "Replay");
+            var rrt = h.replayTag.rectTransform;
+            rrt.anchorMin = rrt.anchorMax = rrt.pivot = new Vector2(1, 1);
+            rrt.anchoredPosition = new Vector2(-36, -30); rrt.sizeDelta = new Vector2(230, 66);
+            h.replayTag.raycastTarget = false;
+            var rtx = UIKit.Txt(h.replayTag.transform, "REPLAY", 40, Color.white, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter);
+            UIKit.Stretch(rtx.rectTransform);
+            h.replayTag.gameObject.SetActive(false);
+
             h.now = UIKit.Txt(safe, "AGORA!", 120, Theme.FeedGold, FontStyle.Bold, TextAnchor.MiddleCenter);
             var nrt = h.now.rectTransform;
             nrt.anchorMin = new Vector2(0, .5f); nrt.anchorMax = new Vector2(1, .5f);
@@ -260,6 +270,8 @@ namespace Camisa10.UI
             return s.Length > 3 ? s.Substring(0, 3) : s;
         }
         public void SetHint(string s) => hint.text = s;
+        Image replayTag;
+        public void ReplayTag(bool on) { if (replayTag != null) replayTag.gameObject.SetActive(on); }
         public void ShowNow(bool on) { if (now.gameObject.activeSelf != on) now.gameObject.SetActive(on); }
 
         bool intro;

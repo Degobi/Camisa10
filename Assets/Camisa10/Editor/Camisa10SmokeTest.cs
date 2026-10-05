@@ -24,13 +24,13 @@ namespace Camisa10.EditorTools
             EditorApplication.update += Tick;
         }
 
-        static readonly string[] Types = { "penalti", "falta", "chance", "cabeceio", "corte", "cruzamento", "rebote", "cara", "contra", "meio", "defesa", "gol" }; // "gol": lance de chance encerrado como gol (comemoração completa)
+        static readonly string[] Types = { "penalti", "falta", "chance", "cabeceio", "corte", "cruzamento", "rebote", "cara", "contra", "meio", "defesa", "gol", "replay" }; // "gol": lance de chance encerrado como gol (comemoração completa); "replay": gol com replay em câmera lenta
         static int index, errors;
-        static float stepAt;
+        static float stepAt, unscaledStep;
         static int stage;
         static ChanceHud hud;
         static Chance3D chance;
-        static bool done, skillTried, celebrated;
+        static bool done, skillTried, celebrated, replaySeen;
         static readonly List<string> report = new List<string>();
         static GameObject canvasGo;
 
@@ -67,6 +67,38 @@ namespace Camisa10.EditorTools
                 return;
             }
             float t = Time.time - stepAt;
+            if (Types[index] == "replay")
+            {
+                if (stage == 0 && t > 1.6f) { chance.TestReplay(); stage = 2; stepAt = Time.time; return; }
+                if (stage == 2 && chance != null && chance.Replaying && !replaySeen && Time.time - stepAt > .8f)
+                {
+                    // fotografa o replay no meio da câmera lenta
+                    replaySeen = true;
+                    report.Add($"    replay: passou em câmera lenta (escala de tempo {Time.timeScale:0.0})");
+                    var view = chance.ViewTexture as RenderTexture;
+                    if (view != null)
+                    {
+                        var prev = RenderTexture.active; RenderTexture.active = view;
+                        var tex = new Texture2D(view.width, view.height, TextureFormat.RGB24, false);
+                        tex.ReadPixels(new Rect(0, 0, view.width, view.height), 0, 0); tex.Apply();
+                        RenderTexture.active = prev;
+                        string dir = System.IO.Path.GetFullPath(System.IO.Path.Combine(Application.dataPath, "..", "Capturas"));
+                        System.IO.Directory.CreateDirectory(dir);
+                        System.IO.File.WriteAllBytes(System.IO.Path.Combine(dir, "replay.png"), tex.EncodeToPNG());
+                        Object.Destroy(tex);
+                    }
+                }
+                if (stage == 2 && (done || Time.unscaledTime - unscaledStep > 30f))
+                {
+                    if (!done) { errors++; report.Add("ERRO em 'replay': o lance não terminou em 30 s"); }
+                    if (!replaySeen) { errors++; report.Add("ERRO em 'replay': o replay não apareceu"); }
+                    if (Time.timeScale != 1f) { errors++; report.Add("ERRO em 'replay': o jogo ficou em câmera lenta"); }
+                    if (chance != null) Object.Destroy(chance.gameObject);
+                    hud?.Destroy();
+                    Finish();
+                }
+                return;
+            }
             if (Types[index] == "gol")
             {
                 if (stage == 0 && t > 1.6f) { chance.TestGoal(); stage = 2; stepAt = Time.time; return; }
@@ -77,7 +109,8 @@ namespace Camisa10.EditorTools
                     if (!celebrated) { errors++; report.Add("ERRO em 'gol': a comemoração não apareceu"); }
                     if (chance != null) Object.Destroy(chance.gameObject);
                     hud?.Destroy();
-                    Finish();
+                    index++;
+                    StartNext();
                 }
                 return;
             }
@@ -125,7 +158,7 @@ namespace Camisa10.EditorTools
             foreach (var t in Game.Traits) game.S.traits.Add(t.Id);
             game.S.player.fans = index % 2 == 0 ? 90 : 10;
             var match = new MatchEngine(game) { Current = new Moment { Type = Types[index] == "gol" ? "chance" : Types[index], Text = "Teste automático", Options = new MomentOption[0] } };
-            done = false; stage = 0; stepAt = Time.time; skillTried = false; celebrated = false;
+            done = false; stage = 0; stepAt = Time.time; skillTried = false; celebrated = false; unscaledStep = Time.unscaledTime;
             hud = ChanceHud.Build(canvasGo.transform);
             string type = Types[index];
             chance = Chance3D.Play(null, game, match, hud, o => { done = true; report.Add($"ok  {type,-9} → {o}"); });
