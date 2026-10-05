@@ -67,6 +67,7 @@ namespace Camisa10.Core
         public int objMet = -1;                                  // objetivos cumpridos (fim de temporada; -1 = ainda não avaliado)
         public bool transferRequest;                             // pediu para ser negociado
         public string rumor, startClub;                          // clube do rumor na imprensa; clube no começo da temporada
+        public bool galaShown;                                   // a gala de fim de temporada já apareceu
     }
 
     [Serializable]

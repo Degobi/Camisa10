@@ -116,7 +116,7 @@ namespace Camisa10.EditorTools
             var scaler = go.GetComponentInChildren<UnityEngine.UI.CanvasScaler>();
 
             var scroll = (UnityEngine.UI.ScrollRect)t.GetField("scroll", flags).GetValue(app);
-            foreach (var shot in new[] { "home", "home-baixo", "inbox", "player", "life", "life-meio", "life-baixo", "agenda", "settings", "trophies", "posjogo", "coletiva", "contrato-janela", "fim" })
+            foreach (var shot in new[] { "home", "home-baixo", "inbox", "player", "life", "life-meio", "life-baixo", "agenda", "settings", "trophies", "posjogo", "coletiva", "contrato-janela", "fim", "gala" })
             {
                 string tab = shot.Replace("-baixo", "").Replace("-meio", "");
                 if (shot == "posjogo" || shot == "coletiva" || shot == "fim") tab = "home";
@@ -132,6 +132,7 @@ namespace Camisa10.EditorTools
                     PlayRounds(game, game.WindowRound - game.S.season.week);
                 }
                 if (shot == "fim") PlayRounds(game, 99); // fim de temporada: balanço, objetivos e propostas
+                if (shot == "gala") { tab = "home"; game.S.season.galaShown = false; }
                 t.GetField("tab", flags).SetValue(app, tab);
                 if (shot != "coletiva") t.GetMethod("Render", flags).Invoke(app, new object[] { true });
                 if (shot == "posjogo")
@@ -142,6 +143,7 @@ namespace Camisa10.EditorTools
                     t.GetMethod("Render", flags).Invoke(app, new object[] { true });
                     t.GetMethod("ShowPostMatch", flags).Invoke(app, new object[] { m, snap, null });
                 }
+                if (shot == "gala") t.GetMethod("ShowGala", flags).Invoke(app, null);
                 if (shot == "coletiva")
                 {
                     var m = (MatchEngine)t.GetField("postMatch", flags).GetValue(app);

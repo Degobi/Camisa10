@@ -175,6 +175,7 @@ namespace Camisa10.UI
             Commit(null, true);
             if (game.S.mailsThisRound > 0) Toast(game.S.mailsThisRound == 1 ? "Você tem uma mensagem nova." : $"Você tem {game.S.mailsThisRound} mensagens novas.");
             if (wc != null) ShowModal(game.S.wc.champion ? "CAMPEÃO DO MUNDO!" : "Copa do Mundo", wc, ("Continuar", (Action)CloseModal, true));
+            else if (GalaPending) ShowGala(); // fim do campeonato: a gala de premiação
         }
 
         /// <summary>Janela com as opções empilhadas (respostas longas cabem inteiras).</summary>

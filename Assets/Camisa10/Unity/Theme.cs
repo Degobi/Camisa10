@@ -30,6 +30,8 @@ namespace Camisa10.UI
         public static readonly Color Red = Hex("#FF5468");
         public static readonly Color Good = Hex("#19E68C");
         public static readonly Color Purple = Hex("#9B6BFF");
+        public static readonly Color Silver = Hex("#C9D1DB");     // pódio
+        public static readonly Color Bronze = Hex("#C98B5A");
         public static readonly Color ShirtGreen = Hex("#17502F");
 
         // partida
