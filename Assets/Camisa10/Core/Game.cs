@@ -9,11 +9,11 @@ namespace Camisa10.Core
     /// </summary>
     public partial class Game
     {
-        public const int RoundsPerSeason = 18;
+        public const int RoundsPerSeason = 36; // quatro turnos de 9 rodadas entre os 10 clubes
         public GameState S;
         public long Counter; // contraproposta pendente na negociação (não é salva)
 
-        public Game(GameState state) { S = state; EnsureProfile(); SyncClubs(); EnsureBusiness(); EnsureGlory(); }
+        public Game(GameState state) { S = state; EnsureProfile(); SyncClubs(); EnsureBusiness(); EnsureGlory(); EnsureLife(); }
 
         /// <summary>Saves antigos não tinham identidade: gera uma e marca a versão atual do formato.</summary>
         void EnsureProfile()
@@ -110,7 +110,7 @@ namespace Camisa10.Core
 
         public void AddNews(string text)
         {
-            S.news.Insert(0, new News { when = $"{S.year}, rodada {Math.Min(RoundsPerSeason, S.season.week + 1)}", text = text });
+            S.news.Insert(0, new News { when = $"{S.year}, rodada {Math.Min(SeasonRounds, S.season.week + 1)}", text = text });
             if (S.news.Count > 40) S.news.RemoveRange(40, S.news.Count - 40);
         }
 
@@ -141,6 +141,7 @@ namespace Camisa10.Core
             s.contract.bonus = g.GoalBonusFor(s.contract.salary);
             s.contract.clause = R10k(g.MarketValue() * 2);
             g.StartSeason();
+            g.EnsureLife();
             g.AddNews($"Você assinou seu primeiro contrato profissional com o {g.MyClub.name}. Salário de {Fmt.Money(s.contract.salary)} por semana.");
             return g;
         }
@@ -176,13 +177,15 @@ namespace Camisa10.Core
                 arr.RemoveAt(n - 1);
                 arr.Insert(1, last);
             }
-            var all = new List<Round>(first);
-            foreach (var rd in first)
-            {
-                var back = new Round();
-                foreach (var pr in rd.games) back.games.Add(new Pair { home = pr.away, away = pr.home });
-                all.Add(back);
-            }
+            // quatro turnos: ida, volta, ida e volta de novo (cada jogo é uma partida própria)
+            var all = new List<Round>();
+            for (int leg = 0; leg < 4; leg++)
+                foreach (var rd in first)
+                {
+                    var r2 = new Round();
+                    foreach (var pr in rd.games) r2.games.Add(leg % 2 == 0 ? new Pair { home = pr.home, away = pr.away } : new Pair { home = pr.away, away = pr.home });
+                    all.Add(r2);
+                }
             return all;
         }
 
@@ -237,8 +240,8 @@ namespace Camisa10.Core
         (string kind, float target) MakeGoal()
         {
             int o = Ovr;
-            if (S.player.pos == "ATA") return ("gols", Rng.RangeInt(5, 8) + (o >= 70 ? 4 : 0) + (o >= 80 ? 4 : 0));
-            if (S.player.pos == "MEI") return ("part", Rng.RangeInt(5, 8) + (o >= 72 ? 4 : 0));
+            if (S.player.pos == "ATA") return ("gols", Rng.RangeInt(9, 13) + (o >= 70 ? 6 : 0) + (o >= 80 ? 6 : 0));
+            if (S.player.pos == "MEI") return ("part", Rng.RangeInt(9, 13) + (o >= 72 ? 6 : 0));
             return ("nota", (float)Math.Round(Rng.RangeF(6.6, 7.1), 1));
         }
 
@@ -246,7 +249,7 @@ namespace Camisa10.Core
         {
             if (d.goalKind == "gols") return $"Meta: {d.goalTarget:0} gols na temporada";
             if (d.goalKind == "part") return $"Meta: {d.goalTarget:0} gols + assistências na temporada";
-            return $"Meta: nota média {Fmt.Rating(d.goalTarget)} ou mais (mínimo 8 jogos)";
+            return $"Meta: nota média {Fmt.Rating(d.goalTarget)} ou mais (mínimo 15 jogos)";
         }
 
         public bool GoalMet(SponsorDeal d)
@@ -254,7 +257,7 @@ namespace Camisa10.Core
             var st = S.season.stats;
             if (d.goalKind == "gols") return st.goals >= d.goalTarget;
             if (d.goalKind == "part") return st.goals + st.assists >= d.goalTarget;
-            return st.apps >= 8 && AvgRating >= d.goalTarget;
+            return st.apps >= 15 && AvgRating >= d.goalTarget;
         }
 
         public float GoalProgress01(SponsorDeal d)
@@ -292,7 +295,7 @@ namespace Camisa10.Core
         }
 
         public void DeclineSponsor(string id) => S.sponsorOffers.RemoveAll(x => x.id == id);
-        public double SponsorWeekly => S.activeSponsors.Sum(d => d.perSeason / (double)RoundsPerSeason);
+        public double SponsorWeekly => S.activeSponsors.Sum(d => d.perSeason / (double)SeasonRounds);
 
         // ---------- semana ----------
         public Role ComputeRole()
@@ -358,7 +361,7 @@ namespace Camisa10.Core
                 p.form.Add(m.Rating); if (p.form.Count > 5) p.form.RemoveAt(0);
                 p.moral += (m.Rating - 6.5f) * 4 + (m.Result == 'w' ? 3 : m.Result == 'l' ? -3 : 0);
                 p.coach += (m.Rating - 6.5f) * 3;
-                p.fame += (float)((m.Goals * .9 + m.Assists * .5 + (m.Rating >= 8 ? 1 : 0)) * L.FameMult * (1 - p.fame / 115.0));
+                p.fame += (float)((m.Goals * .55 + m.Assists * .3 + (m.Rating >= 8 ? .6 : 0)) * L.FameMult * (1 - p.fame / 115.0));
                 p.energy -= m.Role == Role.Reserva ? 10 : 22;
                 if (m.Sent) p.coach -= 5;
                 if (p.energy < 30 && Rng.Chance(.1))
@@ -373,10 +376,11 @@ namespace Camisa10.Core
                 p.energy += 8;
             }
             if (m.Role == Role.Lesionado && p.injury > 0) p.injury--;
-            p.fame -= .3f;
-            p.money += S.contract.salary + S.contract.bonus * m.Goals + (long)Math.Round(SponsorWeekly);
+            p.fame -= .15f;
             WeekBusiness();
+            PayWeek(m.Goals);
             GloryAfterRound(m);
+            LifeWeek(m);
             Normalize();
 
             string line = $"{m.My.name} {m.Gf} x {m.Ga} {m.Opp.name}";
@@ -389,11 +393,11 @@ namespace Camisa10.Core
             AddNews(line + ".");
 
             se.lastRole = m.Role; se.week++; se.rested = false; se.role = Role.None;
-            if (se.week >= RoundsPerSeason) EndSeason();
+            if (se.week >= SeasonRounds) EndSeason();
             else
             {
                 se.phase = "train";
-                if (se.week == 9)
+                if (se.week == SeasonRounds / 2)
                 {
                     GenSponsorOffers();
                     if (S.sponsorOffers.Count > 0) AddNews("Novas propostas de patrocínio chegaram.");
@@ -446,6 +450,12 @@ namespace Camisa10.Core
             var c = MyClub;
             S.career.Add(new CareerRecord { year = se.year, club = c.name, c1 = c.c1, c2 = c.c2, rank = rank, apps = st.apps, goals = st.goals,
                 assists = st.assists, avg = st.apps > 0 ? (float)Math.Round(avg, 1) : 0 });
+            // a temporada em números: dinheiro e a disputa com o rival
+            sm.notes.Add(S.seasonNet >= 0 ? $"Você guardou {Fmt.Money(S.seasonNet)} na temporada, já descontados impostos e despesas."
+                : $"A temporada fechou no prejuízo: {Fmt.Money(-S.seasonNet)} a mais em despesas do que em receitas.");
+            if (!string.IsNullOrEmpty(S.rival.name))
+                sm.notes.Add($"Rivalidade: você fez {st.goals} gol(s); {S.rival.name} fez {S.rival.goals}." +
+                    (S.rival.duels > 0 ? $" Nos duelos diretos, você venceu {S.rival.won} de {S.rival.duels}." : ""));
             S.titles.AddRange(sm.titles);
             S.awards.AddRange(sm.awards);
             CheckAchievements(null);
@@ -525,6 +535,8 @@ namespace Camisa10.Core
             foreach (var c in S.clubs) c.str = (int)Clamp(c.str + Rng.RangeInt(-2, 2), 50, 92);
             S.offers.Clear();
             StartSeason();
+            S.seasonNet = 0;
+            RivalNewSeason();
             AddNews($"Começa a temporada {S.year}. Objetivo: evoluir e brilhar no {MyClub.name}.");
         }
 
@@ -534,12 +546,22 @@ namespace Camisa10.Core
             if (o == null) return null;
             var c = ClubById(o.club);
             bool changed = o.club != S.contract.club;
+            bool moved = changed && c.league != MyClub.league;
             S.contract = new Contract { club = o.club, salary = o.salary, years = o.years, bonus = o.bonus, clause = o.clause };
-            S.player.money += o.signing;
+            // luvas: imposto do novo país e comissão do empresário
+            long net = R1000(o.signing * (1 - TaxRate - AgentFee));
+            S.player.money += net;
+            S.seasonNet += net;
+            if (moved && S.love.stage >= 1 && S.love.stage <= 3)
+            {
+                S.love.affection -= S.love.stage == 1 ? 40 : 18;
+                AddNews(S.love.stage == 1 ? "A mudança de país esfriou o que você tinha com " + S.love.name + "."
+                    : $"{S.love.name} vai tentar o namoro a distância. Vai precisar de atenção.");
+            }
             if (changed)
             {
                 S.player.coach = 50; S.player.moral += 5; S.player.fame += (float)(3 * League(c.league).FameMult);
-                AddNews($"Contratado! Você assinou com o {c.name} por {o.years} temporada(s). Luvas de {Fmt.Money(o.signing)}.");
+                AddNews($"Contratado! Você assinou com o {c.name} por {o.years} temporada(s). Luvas de {Fmt.Money(o.signing)} ({Fmt.Money(net)} líquidos).");
             }
             else AddNews($"Renovação assinada com o {c.name} por {o.years} temporada(s).");
             Normalize();

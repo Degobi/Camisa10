@@ -183,7 +183,7 @@ namespace Camisa10.UI
             var row1 = UIKit.Cols(content);
 
             var next = UIKit.Tile(row1, "Próximo jogo", Theme.Turf, 1.25f);
-            UIKit.Muted(next, $"{Game.League(se.league).Name} · rodada {se.week + 1} de {Game.RoundsPerSeason} · {(f.home ? "em casa" : "fora de casa")}");
+            UIKit.Muted(next, $"{Game.League(se.league).Name} · rodada {se.week + 1} de {game.SeasonRounds} · {(f.home ? "em casa" : "fora de casa")}");
             var vs = UIKit.Row(next, 10, TextAnchor.MiddleCenter);
             TeamColumn(vs, f.home ? game.MyClub : f.opp, Theme.Ink, 120);
             var x = UIKit.Txt(vs, "VS", 44, Theme.Muted, FontStyle.Bold, TextAnchor.MiddleCenter);
@@ -399,6 +399,8 @@ namespace Camisa10.UI
             var hint = UIKit.Muted(t, a.Hint, 22);
             UIKit.LE(hint, flexH: 1);
             string energy = a.Energy == 0 ? "Energia: sem custo" : $"Energia {Signed(a.Energy)}";
+            long cost = game.ActionCost(a.Id);
+            if (cost > 0) energy += $" · {Fmt.Money(cost)}";
             UIKit.Txt(t, energy, 22, a.Energy > 0 ? Theme.Turf : a.Energy < 0 ? Theme.Gold : Theme.Muted, FontStyle.Bold);
             string id = a.Id;
             Button b;
@@ -612,6 +614,22 @@ namespace Camisa10.UI
             Swatches(bc, "Solado", GameData.Soles, p.boot.sole, hex => p.boot.sole = hex);
             if (string.IsNullOrEmpty(p.boot.brand)) UIKit.Muted(bc, "Feche com uma marca de chuteira na aba Patrocínio para liberar mais cores.", 22);
 
+            // comemoração de gol (a cena em terceira pessoa depois do gol)
+            var cc = UIKit.Tile(right, "Comemoração", Theme.Gold);
+            UIKit.Muted(cc, "O que você faz depois de marcar (a cena pode ser pulada).", 20);
+            for (int r0 = 0; r0 < GameData.Celebrations.Length; r0 += 4)
+            {
+                var row = UIKit.Row(cc, 10);
+                for (int i = r0; i < Mathf.Min(r0 + 4, GameData.Celebrations.Length); i++)
+                {
+                    string id = GameData.Celebrations[i][0];
+                    bool sel = (p.celebration ?? "") == id;
+                    var celebBtn = UIKit.Btn(row, GameData.Celebrations[i][1], sel ? Theme.Turf : Theme.Chip, sel ? Theme.TurfInk : Theme.Ink,
+                        () => { p.celebration = id; Commit(); }, 64, 22);
+                    UIKit.LE(celebBtn, flexW: 1, prefW: 0, minW: 0);
+                }
+            }
+
             var hc = UIKit.Tile(right, "Histórico", Theme.Purple, 1, 24, 4);
             if (game.S.career.Count == 0) UIKit.Muted(hc, "Sua primeira temporada ainda está em andamento.");
             else
@@ -798,11 +816,44 @@ namespace Camisa10.UI
 
             var left = UIKit.Stack(cols, .9f);
             var m = UIKit.Tile(left, "Dinheiro em conta", Theme.Gold);
-            UIKit.Txt(m, Fmt.Money(p.money), 64, Theme.Gold, FontStyle.Bold);
-            UIKit.KV(m, "Salário por semana", Fmt.Money(game.S.contract.salary));
-            UIKit.KV(m, "Patrocínios por semana", Fmt.Money(game.SponsorWeekly));
-            UIKit.KV(m, "Bônus por gol", Fmt.Money(game.S.contract.bonus));
+            UIKit.Txt(m, Fmt.Money(p.money), 64, p.money < 0 ? Theme.Red : Theme.Gold, FontStyle.Bold);
+            // extrato da última rodada: o que entrou e o que saiu
+            var w = game.S.lastWeek;
+            UIKit.Label(m, "Extrato da última rodada", Theme.Muted, 20);
+            UIKit.KV(m, "Salário", "+" + Fmt.Money(w.salary));
+            if (w.bonus > 0) UIKit.KV(m, "Bônus por gols", "+" + Fmt.Money(w.bonus));
+            if (w.sponsors > 0) UIKit.KV(m, "Patrocínios", "+" + Fmt.Money(w.sponsors));
+            if (w.business != 0) UIKit.KV(m, "Negócios", (w.business > 0 ? "+" : "") + Fmt.Money(w.business));
+            UIKit.KV(m, $"Imposto de renda ({w.taxRate * 100:0.#}%)", "-" + Fmt.Money(w.tax));
+            UIKit.KV(m, $"Empresário ({Game.AgentFee * 100:0}%)", "-" + Fmt.Money(w.agent));
+            UIKit.KV(m, "Custo de vida", "-" + Fmt.Money(w.living));
+            if (w.upkeep > 0) UIKit.KV(m, "Manutenção dos bens", "-" + Fmt.Money(w.upkeep));
+            if (w.partner > 0) UIKit.KV(m, "Vida a dois", "-" + Fmt.Money(w.partner));
+            UIKit.KV(m, "Saldo da rodada", (w.Net >= 0 ? "+" : "") + Fmt.Money(w.Net));
+            UIKit.KV(m, "Saldo na temporada", (game.S.seasonNet >= 0 ? "+" : "") + Fmt.Money(game.S.seasonNet));
             UIKit.Ghost(m, "Investir em negócios", () => { tab = "business"; Render(true); });
+
+            // vida pessoal: relacionamento e rival
+            var lv = UIKit.Tile(left, "Vida pessoal", Theme.Red);
+            var love = game.S.love;
+            HeadRow(lv, game.LoveLine(), love.stage == 0 ? "SOLTEIRO" : LifeData.StageName(love.stage).ToUpperInvariant(),
+                love.stage == 0 ? Theme.Chip : Theme.Red, love.stage == 0 ? Theme.Ink : Color.white);
+            if (love.stage > 0)
+            {
+                UIKit.KV(lv, "Clima entre vocês", love.affection >= 70 ? "Apaixonados" : love.affection >= 45 ? "Tranquilo" : love.affection >= 25 ? "Esfriando" : "Em crise");
+                UIKit.Muted(lv, "Sem atenção a relação esfria. Jantares e escolhas nos eventos aquecem.", 20);
+            }
+            else UIKit.Muted(lv, "Saia para conhecer gente na Agenda ou responda as mensagens que chegarem.", 20);
+            var rv = game.S.rival;
+            if (!string.IsNullOrEmpty(rv.name) && game.RivalClub != null)
+            {
+                UIKit.Space(lv, 8);
+                UIKit.Label(lv, "Rival", Theme.Gold, 22);
+                UIKit.KV(lv, rv.name, game.RivalClub.name);
+                UIKit.KV(lv, "Gols na temporada", $"você {game.S.season.stats.goals} x {rv.goals} ele");
+                if (rv.duels > 0) UIKit.KV(lv, "Duelos diretos", $"{rv.won} vitória(s) em {rv.duels}");
+                UIKit.KV(lv, "Clima", rv.heat >= 60 ? "Guerra declarada" : rv.heat >= 30 ? "Provocações" : "Respeito");
+            }
 
             var n = UIKit.Tile(left, "Notícias", Theme.Cyan);
             if (game.S.news.Count == 0) UIKit.Muted(n, "Nada por aqui ainda.");
@@ -815,7 +866,7 @@ namespace Camisa10.UI
 
             var right = UIKit.Stack(cols, 1.2f);
             var l = UIKit.Tile(right, "Estilo de vida", Theme.Purple);
-            UIKit.Muted(l, "Garagem, casa e acessórios. Cada compra aumenta sua moral e sua fama.");
+            UIKit.Muted(l, "Garagem, casa e acessórios. Cada compra aumenta sua moral e sua fama, mas tem manutenção toda rodada (seguro, IPVA, condomínio).");
             // vitrine em cards de 3 colunas, com ilustração
             RectTransform line = null;
             int count = 0;
@@ -850,12 +901,13 @@ namespace Camisa10.UI
                 UIKit.LE(name, 32, 32);
                 UIKit.Txt(info, Fmt.Money(it.Price), 26, Theme.Gold, FontStyle.Bold);
                 UIKit.Muted(info, $"{it.Cat} · fama +{it.Fame} · moral +{it.Moral}", 20);
+                UIKit.Muted(info, $"Manutenção {Fmt.Money(Game.ItemUpkeep(it))} por rodada", 20);
                 string id = it.Id;
-                var b = own ? UIKit.Btn(info, "Na garagem", Theme.Card, Theme.Turf, null, 56, 22) : UIKit.Primary(info, "Comprar", () => Commit(game.Buy(id)));
-                if (own && it.Cat == "Casa") b.GetComponentInChildren<Text>().text = "SUA CASA";
-                if (own && it.Cat == "Estilo") b.GetComponentInChildren<Text>().text = "NO PULSO";
+                // o que é seu pode ser vendido (70% do preço) para cortar a manutenção
+                var b = own ? UIKit.Btn(info, $"Vender por {Fmt.Money(Game.R1000(it.Price * .7))}", Theme.Card, Theme.Gold, () => Commit(game.SellItem(id)), 56, 22)
+                    : UIKit.Primary(info, "Comprar", () => Commit(game.Buy(id)));
                 UIKit.LE(b, 56, 56);
-                b.interactable = !own && p.money >= it.Price;
+                b.interactable = own || p.money >= it.Price;
             }
             // completa a última linha para os cards não esticarem
             for (; count % 3 != 0; count++) UIKit.LE(UIKit.Rect("Vazio", line), flexW: 1, prefW: 0, minW: 0);

@@ -26,6 +26,9 @@ namespace Camisa10.UI
 
         const float BodyR = .3f;     // "grossura" do corpo e das luvas
 
+        /// <summary>Relógio do goleiro (a ferramenta de captura avança na mão para fotografar o mergulho).</summary>
+        public static System.Func<float> Now = () => Time.time;
+
         public Goalkeeper(Transform t, float skill01)
         {
             T = t;
@@ -42,7 +45,7 @@ namespace Camisa10.UI
             if (rising)
             {
                 // levantando do chão: gira de volta para de pé em ~0,6 s
-                float u = Mathf.Clamp01((Time.time - riseStart) / .6f);
+                float u = Mathf.Clamp01((Now() - riseStart) / .6f);
                 T.rotation = Quaternion.LookRotation(Vector3.back) * Quaternion.Euler(0, 0, downSide * 85f * (1 - u * u));
                 if (u >= 1) { rising = false; rig?.Set(PersonRig.Mode.Ready); }
                 return;
@@ -102,7 +105,7 @@ namespace Camisa10.UI
             }
             aim = new Vector3(p.x, Mathf.Clamp(p.y, 0, 2.6f), plane);
             if (late) react += .32f;
-            reactAt = Time.time + react;
+            reactAt = Now() + react;
             if (rig != null) rig.Reach = aim; // os braços vão na direção de onde ele acha que a bola vai
 
             float dx = aim.x - origin.x;
@@ -121,7 +124,7 @@ namespace Camisa10.UI
         }
 
         /// <summary>Progresso do mergulho (0 a 1).</summary>
-        float Progress() => Mathf.Clamp01((Time.time - diveStart) / diveDur);
+        float Progress() => Mathf.Clamp01((Now() - diveStart) / diveDur);
         static float Ease(float p) => p * p * (3f - 2f * p); // o impulso das pernas leva um instante para ganhar velocidade
 
         public void Tick(float dt)
@@ -129,7 +132,7 @@ namespace Camisa10.UI
             if (down)
             {
                 // caindo e deitando de lado no gramado (quadril vai para perto do chão)
-                float u = Mathf.Clamp01((Time.time - landStart) / .35f);
+                float u = Mathf.Clamp01((Now() - landStart) / .35f);
                 var lyRot = Quaternion.LookRotation(Vector3.back) * Quaternion.Euler(0, 0, side * Mathf.Clamp(Mathf.Max(rollMax, 82f), 82f, 100f));
                 T.rotation = Quaternion.Slerp(landFrom, lyRot, u * u);
                 var hip = T.position + T.up * HipH;
@@ -139,7 +142,7 @@ namespace Camisa10.UI
             }
             if (!diving)
             {
-                if (reactAt > 0 && Time.time >= reactAt) { diving = true; diveStart = Time.time; rig?.Set(rollMax > 25 ? PersonRig.Mode.Dive : PersonRig.Mode.Jump); }
+                if (reactAt > 0 && Now() >= reactAt) { diving = true; diveStart = Now(); rig?.Set(rollMax > 25 ? PersonRig.Mode.Dive : PersonRig.Mode.Jump); }
                 return;
             }
             float p = Progress(), e = Ease(p);
@@ -147,14 +150,14 @@ namespace Camisa10.UI
             var hipPos = originHip + new Vector3(side * hipShift * e, Mathf.Lerp(.85f, hipEndY, e) - HipH + Mathf.Sin(p * Mathf.PI) * .12f, 0);
             T.rotation = Quaternion.LookRotation(Vector3.back) * Quaternion.Euler(0, 0, side * rollMax * e);
             T.position = hipPos - T.up * HipH; // o corpo gira em volta do quadril
-            if (p >= 1f && Time.time - diveStart > diveDur + .2f) Land();
+            if (p >= 1f && Now() - diveStart > diveDur + .2f) Land();
         }
 
         /// <summary>Começa o lance caído (rebote de uma defesa anterior).</summary>
         public void SetDown(float side)
         {
             down = true; diving = false; rising = false; downSide = side; this.side = side;
-            rollMax = 88f; landStart = Time.time - 1f; landFrom = T.rotation;
+            rollMax = 88f; landStart = Now() - 1f; landFrom = T.rotation;
             var p = T.position; p.y = 0; T.position = p;
             T.rotation = Quaternion.LookRotation(Vector3.back) * Quaternion.Euler(0, 0, side * 88f);
             T.position = new Vector3(p.x, .22f, p.z) - T.up * HipH;
@@ -165,7 +168,7 @@ namespace Camisa10.UI
         public void GetUp()
         {
             if (!down) return;
-            down = false; rising = true; riseStart = Time.time;
+            down = false; rising = true; riseStart = Now();
             var p = T.position; T.rotation = Quaternion.LookRotation(Vector3.back); p.y = 0; T.position = p;
             rig?.Set(PersonRig.Mode.Stumble);
         }
@@ -175,7 +178,7 @@ namespace Camisa10.UI
         {
             if (down) return;
             down = true; diving = false;
-            landStart = Time.time; landFrom = T.rotation;
+            landStart = Now(); landFrom = T.rotation;
         }
 
         /// <summary>Segmento do corpo agora: dos pés às mãos (braços esticados acima da cabeça no mergulho).</summary>

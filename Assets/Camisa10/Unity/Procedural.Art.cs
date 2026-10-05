@@ -80,6 +80,9 @@ namespace Camisa10.UI
 
         public static Sprite BootSprite(BootStyle b)
         {
+            // foto do modelo 3D da chuteira; o desenho só entra se a foto falhar
+            var photo = BootModel.Photo(b);
+            if (photo != null) return photo;
             if (bootSprite != null) { Object.Destroy(bootSprite.texture); Object.Destroy(bootSprite); }
             bootSprite = ToSprite(BootArt.Render(b.c1, b.c2, b.sole, 750));
             return bootSprite;

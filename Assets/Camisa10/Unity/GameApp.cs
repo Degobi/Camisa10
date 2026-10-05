@@ -45,7 +45,7 @@ namespace Camisa10.UI
         string negMsg = "";
 
         /// <summary>Versão mostrada no topo: confirma que a Unity está rodando o código novo.</summary>
-        public const string Version = "0.13";
+        public const string Version = "0.14";
 
         // abas do menu principal (ordem da barra)
         static readonly (string id, string label)[] Tabs =
@@ -256,7 +256,7 @@ namespace Camisa10.UI
 
             var when = UIKit.Column(header, 0, TextAnchor.MiddleRight);
             UIKit.LE(when, prefW: 330, minW: 260);
-            var l1 = UIKit.Label(when, se.phase == "end" ? $"Temporada {se.year} · encerrada" : $"Temporada {se.year} · rodada {se.week + 1}/{Game.RoundsPerSeason}", Theme.Muted, 22);
+            var l1 = UIKit.Label(when, se.phase == "end" ? $"Temporada {se.year} · encerrada" : $"Temporada {se.year} · rodada {se.week + 1}/{game.SeasonRounds}", Theme.Muted, 22);
             l1.alignment = TextAnchor.UpperRight;
             var l2 = UIKit.Txt(when, Fmt.Money(p.money), 36, Theme.Gold, FontStyle.Bold, TextAnchor.UpperRight);
             FitLine(l2, 20, 46);

@@ -34,6 +34,13 @@ namespace Camisa10.Core
             new ActionDef { Id = "social", Icon = "SOC", Name = "Ação social", Energy = -4, Hint = "Aumenta moral e fama." },
             new ActionDef { Id = "balada", Icon = "NOI", Name = "Noite com os amigos", Energy = -12, Hint = "Moral lá em cima, mas o técnico pode descobrir." },
             new ActionDef { Id = "empresario", Icon = "EMP", Name = "Reunião com o empresário", Energy = 0, Hint = "Divulga seu nome no mercado. Atrai propostas, irrita a diretoria.", Available = g => g.S.player.fame >= 15 && !g.S.season.forceExit },
+            // vida pessoal
+            new ActionDef { Id = "encontro", Icon = "AMO", Name = "Jantar a dois", Energy = -3, Hint = "Cuida do relacionamento. Custa um jantar caprichado.", Available = g => g.S.love.stage >= 1 },
+            new ActionDef { Id = "paquera", Icon = "SAI", Name = "Sair para conhecer gente", Energy = -8, Hint = "Solteiro? Pode conhecer alguém. Pode render fofoca também.", Available = g => g.S.love.stage == 0 },
+            new ActionDef { Id = "familia", Icon = "FAM", Name = "Visitar a família", Energy = 6, Hint = "Comida de mãe e descanso. Moral e energia." },
+            new ActionDef { Id = "fisio", Icon = "FIS", Name = "Fisioterapeuta particular", Energy = 22, Hint = "Recupera bem mais que o CT, mas é pago do seu bolso." },
+            new ActionDef { Id = "podcast", Icon = "POD", Name = "Podcast de futebol", Energy = -3, Hint = "Cachê e fama. Fale demais e vira polêmica.", Available = g => g.S.player.fame >= 12 },
+            new ActionDef { Id = "rival", Icon = "RIV", Name = "Alfinetar o rival", Energy = 0, Hint = "Provoca seu rival nas redes. A torcida adora; o clube, nem tanto.", Available = g => !string.IsNullOrEmpty(g.S.rival.name) },
         };
 
         public static ActionDef Action(string id) => Array.Find(Actions, a => a.Id == id);
@@ -71,17 +78,17 @@ namespace Camisa10.Core
 
         public static readonly VentureDef[] Ventures =
         {
-            new VentureDef { Id = "society", Cat = "Esporte", Name = "Quadra de futebol society", Price = 60000, Weekly = 1300, Fame = 0, Moral = 2, Risk = .2,
+            new VentureDef { Id = "society", Cat = "Esporte", Name = "Quadra de futebol society", Price = 60000, Weekly = 420, Fame = 0, Moral = 2, Risk = .2,
                 Hint = "Aluguel de quadra por hora. Receita estável." },
-            new VentureDef { Id = "canal", Cat = "Mídia", Name = "Canal de futebol na internet", Price = 90000, Weekly = 800, Fame = 2, Moral = 2, Risk = .5,
+            new VentureDef { Id = "canal", Cat = "Mídia", Name = "Canal de futebol na internet", Price = 90000, Weekly = 300, Fame = 2, Moral = 2, Risk = .5,
                 Hint = "Rende mais quanto maior a sua fama." },
-            new VentureDef { Id = "loja", Cat = "Varejo", Name = "Loja de artigos esportivos", Price = 180000, Weekly = 3600, Fame = 1, Moral = 2, Risk = .3,
+            new VentureDef { Id = "loja", Cat = "Varejo", Name = "Loja de artigos esportivos", Price = 180000, Weekly = 1100, Fame = 1, Moral = 2, Risk = .3,
                 Hint = "Camisas, chuteiras e bolas no centro da cidade." },
-            new VentureDef { Id = "escolinha", Cat = "Base", Name = "Escolinha de futebol com seu nome", Price = 450000, Weekly = 6500, MinFame = 10, Fame = 6, Moral = 5, Risk = .15,
+            new VentureDef { Id = "escolinha", Cat = "Base", Name = "Escolinha de futebol com seu nome", Price = 450000, Weekly = 2500, MinFame = 10, Fame = 6, Moral = 5, Risk = .15,
                 Hint = "Forma talentos e melhora sua imagem." },
-            new VentureDef { Id = "agencia", Cat = "Gestão", Name = "Agência de jogadores", Price = 1500000, Weekly = 26000, MinFame = 35, Fame = 3, Moral = 2, Risk = .6,
+            new VentureDef { Id = "agencia", Cat = "Gestão", Name = "Agência de jogadores", Price = 1500000, Weekly = 9000, MinFame = 35, Fame = 3, Moral = 2, Risk = .6,
                 Hint = "Comissão sobre transferências. Semanas boas e ruins." },
-            new VentureDef { Id = "clube", Cat = "Clube", Name = "Clube da quarta divisão (SAF)", Price = 9000000, Weekly = 140000, MinFame = 55, Fame = 8, Moral = 6, Risk = .8,
+            new VentureDef { Id = "clube", Cat = "Clube", Name = "Clube da quarta divisão (SAF)", Price = 9000000, Weekly = 52000, MinFame = 55, Fame = 8, Moral = 6, Risk = .8,
                 Hint = "Você vira dono de clube. Alto risco, alto retorno." },
         };
 
@@ -130,8 +137,12 @@ namespace Camisa10.Core
             if (S.season.doneActions.Contains(id)) { why = "Já feito nesta rodada."; return false; }
             if (a.Available != null && !a.Available(this)) { why = "Indisponível agora."; return false; }
             if (a.Energy < 0 && S.player.energy + a.Energy < 5) { why = "Energia insuficiente."; return false; }
+            if (ActionCost(id) > S.player.money) { why = "Sem dinheiro."; return false; }
             return true;
         }
+
+        /// <summary>Quanto a ação custa do seu bolso (0 = de graça).</summary>
+        public long ActionCost(string id) => id == "encontro" ? R100(350 + S.contract.salary * .03) : id == "fisio" ? R100(1800 * CostMult) : 0;
 
         public string DoAction(string id)
         {
@@ -199,6 +210,51 @@ namespace Camisa10.Core
                     p.coach -= 6; se.forceExit = true;
                     msg = "Seu nome está circulando. Mais clubes vão te observar no fim da temporada.";
                     break;
+                case "encontro":
+                {
+                    long cost = ActionCost(id);
+                    p.money -= cost; S.love.affection = (float)Clamp(S.love.affection + 14, 0, 100); p.moral += 3;
+                    msg = $"Jantar com {S.love.name}. A noite foi ótima ({Fmt.Money(cost)}).";
+                    break;
+                }
+                case "paquera":
+                    p.moral += 3;
+                    if (Rng.Chance(.4 + p.fame / 250.0))
+                    {
+                        StartDating();
+                        msg = $"Você conheceu {S.love.name}, {S.love.job}. Vocês trocaram telefone.";
+                        AddNews($"Você foi visto jantando com {S.love.name}. As redes já especulam.");
+                    }
+                    else if (Rng.Chance(.2)) { p.coach -= 3; msg = "A noite rendeu fofoca em site de celebridades. O técnico não curtiu."; }
+                    else msg = "Noite divertida, mas ninguém especial.";
+                    break;
+                case "familia":
+                    p.moral += 5;
+                    msg = "Almoço de domingo com a família. Você voltou renovado.";
+                    break;
+                case "fisio":
+                {
+                    long cost = ActionCost(id);
+                    p.money -= cost;
+                    msg = $"Sessão com o fisioterapeuta particular: {Fmt.Money(cost)}. O corpo agradece.";
+                    break;
+                }
+                case "podcast":
+                {
+                    long fee = R100(1200 + p.fame * 110);
+                    p.money += fee; p.fame += (float)(1.2 * (1 - p.fame / 120.0));
+                    if (Rng.Chance(.18)) { p.coach -= 4; msg = $"O corte do podcast viralizou pelo motivo errado. Cachê de {Fmt.Money(fee)}."; AddNews("Declaração em podcast gerou polêmica."); }
+                    else msg = $"Papo bom no podcast. Cachê de {Fmt.Money(fee)}.";
+                    break;
+                }
+                case "rival":
+                {
+                    var r = S.rival;
+                    r.heat = (float)Clamp(r.heat + 12, 0, 100); p.fame += 1.2f; p.moral += 2;
+                    if (Rng.Chance(.25 + r.heat / 400.0)) { p.coach -= 3; msg = $"Sua provocação para {r.name} pegou mal no clube. Pediram calma."; }
+                    else msg = $"A torcida foi à loucura com a alfinetada em {r.name}.";
+                    break;
+                }
                 default:
                     msg = "Feito.";
                     break;
@@ -269,7 +325,7 @@ namespace Camisa10.Core
             {
                 var q = Quote(d.Id);
                 if (q == null) continue;
-                double move = d.Drift + Rng.Gauss() * d.Vol;
+                double move = d.Drift * .5 + Rng.Gauss() * d.Vol * .75; // rodadas mais curtas: menos variação por rodada
                 if (d.ClubName != null)
                 {
                     // SAF: o preço persegue o desempenho do clube na tabela (quando ele está na sua liga)

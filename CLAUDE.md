@@ -9,8 +9,14 @@ Não é gerenciador estilo Brasfoot: você controla um jogador, não um time.
 - Os lances decisivos da partida são jogados em **3D pelos olhos do jogador**, com chute por **swipe**
   (direção = alvo, velocidade = força, curva do traço = efeito). Goleiro reage, barreira pula.
 - Fora de campo: carreira, contratos, patrocínios, chuteira personalizável, decisões e vida do jogador.
-- **Agenda da semana** (3 ações por rodada: técnico, imprensa, redes, patrocinador, treino extra...) e
-  **Negócios** (bolsa fictícia do futebol com SAFs e empresas próprias que rendem por rodada): `Core/Business.cs`.
+- **Agenda da semana** (3 ações por rodada: técnico, imprensa, redes, patrocinador, treino extra, jantar a dois,
+  fisioterapeuta pago, podcast, alfinetar o rival...) e **Negócios** (bolsa fictícia com SAFs e empresas próprias): `Core/Business.cs`.
+- Temporada de **36 rodadas** (quatro turnos entre 10 clubes). Use `Game.SeasonRounds` (saves antigos podem ter 18), nunca
+  o número fixo. Copa, seleção e prêmio do mês (a cada 4 rodadas) ficam em `Core/Glory.cs`.
+- **Vida fora de campo** em `Core/Life.cs`: extrato semanal (imposto de renda por país em `LeagueDef.Tax`, 8% do empresário,
+  custo de vida, manutenção dos bens, vida a dois), dívida, namorada (ficando → namorando → noivos → casados, com afeto
+  que esfria) e rival fictício da mesma posição (gols, duelos diretos, provocações). Eventos ligados a eles em `GameEvents.cs`.
+  Calibre o dinheiro com o simulador (ele imprime o dinheiro e o saldo de cada temporada).
 - Plataforma: Android primeiro, iOS depois (o dono tem Mac). Idioma da interface: português do Brasil.
 
 ## Stack e regras do projeto
@@ -25,7 +31,11 @@ Não é gerenciador estilo Brasfoot: você controla um jogador, não um time.
   fica em `Chance3D.Shooting`: segurar CHUTAR carrega a força, falta/pênalti têm mira arrastável e efeito),
   `Goalkeeper` (reação + mergulho físico; calibrado por simulação: goleiro médio defende ~50% de canto baixo com força a 18 m,
   ~40% de ângulo, quase tudo no meio; pênalti com canto certo ~50%: mexa nos números testando a taxa, não no olho),
-  `SwipePad` e `TouchControls` (entrada), `ChanceHud` (HUD do lance, placar estilo TV e vinheta).
+  `SwipePad` e `TouchControls` (entrada), `ChanceHud` (HUD do lance, placar estilo TV e vinheta),
+  `Chance3D.Celebration` (comemoração em terceira pessoa depois do gol, com gestos do `PersonRig.Gesture`, pulável).
+  Chuteira: `Art/BootModel.cs` (malha própria com cano aberto, forro, lingueta, cadarço, solado e travas; textura nas cores
+  do `BootStyle`; a mesma malha vira a foto do menu). Mudou forma do corpo ou da chuteira? Suba `ProceduralBody.ModelVersion`
+  e gere `Resources/Modelos/corpo.bytes` de novo (menu Camisa 10 > Gerar corpo dos jogadores).
   Movimento em campo com aceleração e bote (`Chance3D.Steer`), e o `PersonRig` escolhe parado/andando/correndo pela
   velocidade medida: mova o Transform, não force a animação.
 - Nota da partida por ações (`MatchEngine.Score` e a tabela `MatchEngine.Pts`): nota = 6,0 + pontos ÷ 10, entre 3 e 10.

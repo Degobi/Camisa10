@@ -9,28 +9,17 @@ namespace Camisa10.UI
     {
         bool crossPass; // o passe em voo é um cruzamento (o companheiro cabeceia)
 
-        /// <summary>Corte de cabeça: a qualidade depende do tempo (anel) e da disputa com o atacante.</summary>
-        void CorteButton()
+        /// <summary>Corte de cabeça: salto no tempo certo e disputa com o atacante.</summary>
+        void CorteButton() => HeaderButton();
+
+        void CorteContact(float q)
         {
-            if (!crossLaunched || Time.time < windowOpen - .05f)
-            {
-                // subiu antes da hora: o atacante cabeceia sozinho
-                AttackerHeads("SUBIU ANTES DA HORA");
-                return;
-            }
-            if (Time.time > windowClose) return;
-            float off = Mathf.Abs(Time.time - headArrive);
-            float q = Mathf.Clamp01(1f - off / .3f);
             float duel = Mathf.Clamp(.5f + ((Stat(Attr.Def) + Stat(Attr.Fis)) / 2f - 60f) * .012f - opp01 * .15f + q * .25f, .15f, .95f);
-            A.Ball.isKinematic = true;
-            A.Ball.transform.position = headPoint;
             if (!Rng.Chance(duel)) { AttackerHeads("ELE GANHOU NO ALTO"); return; }
-            // tira para longe, para a lateral ou para o meio-campo
             float side = headPoint.x >= 0 ? 1 : -1;
             var away = new Vector3(Mathf.Clamp(headPoint.x + side * R(6, 16), -32, 32), 0, headPoint.z - R(16, 30));
-            curveAccel = 0;
-            Launch(headPoint, away, R(15, 19));
-            sfx?.Kick(.55f);
+            Launch(A.Ball.transform.position, away, R(15, 19));
+            sfx?.Kick(.55f, true);
             Rig(attacker)?.Set(PersonRig.Mode.Jump);
             Finish(LiveOutcome.Cleared, q > .75f ? "CORTOU NA MEDIDA!" : "CORTOU!");
         }

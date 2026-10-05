@@ -9,7 +9,7 @@ namespace Camisa10.UI
     /// </summary>
     public class PersonRig : MonoBehaviour
     {
-        public enum Mode { Idle, Run, Ready, Jump, Dive, Stumble, Celebrate }
+        public enum Mode { Idle, Run, Ready, Jump, Dive, Stumble, Celebrate, Pose }
 
         public Mode mode = Mode.Idle;
         public float speed = 1f;  // velocidade da corrida em m/s (controla a cadência)
@@ -23,7 +23,7 @@ namespace Camisa10.UI
         static readonly Color[] Skins = { Theme.Hex("#F1C9A5"), Theme.Hex("#D9A27A"), Theme.Hex("#B07A52"), Theme.Hex("#8D5A3B"), Theme.Hex("#5C3A24") };
         static readonly Color[] Hairs = { Theme.Hex("#1B1410"), Theme.Hex("#3B2A1E"), Theme.Hex("#6B4A2B"), Theme.Hex("#C9A15A"), Theme.Hex("#111111") };
 
-        public static PersonRig Build(Transform parent, string name, Color shirt, Color shorts, Color socks, Color boots, int number, bool keeper, Kit kit = null)
+        public static PersonRig Build(Transform parent, string name, Color shirt, Color shorts, Color socks, Color boots, int number, bool keeper, Kit kit = null, BootStyle bootStyle = null)
         {
             var root = new GameObject(name).transform;
             root.SetParent(parent, false);
@@ -33,7 +33,7 @@ namespace Camisa10.UI
             var human = HumanModel.Get();
             if (human != null)
             {
-                rig.BuildHuman(human, shirt, shorts, socks, boots, number, keeper, kit);
+                rig.BuildHuman(human, shirt, shorts, socks, boots, number, keeper, kit, bootStyle);
                 return rig;
             }
 
@@ -103,6 +103,13 @@ namespace Camisa10.UI
         public Transform LookAt;
         /// <summary>Goleiro: ponto (mundo) para onde os braços esticam no mergulho.</summary>
         public Vector3? Reach;
+        /// <summary>
+        /// Gesto de comemoração por cima da animação: "aviao", "joelhada", "soco", "silencio", "coracao", "danca", "abraco".
+        /// Vazio = nenhum. Funciona correndo (aviãozinho) ou parado (Mode.Pose).
+        /// </summary>
+        public string Gesture;
+        float wGesture, gestureTime, gestureLift;
+        Vector3 gestureLean;
         // velocidade medida pelo deslocamento real: escolhe andar/correr e a cadência sem o pé "patinar"
         Vector3 lastPos, moveVel, leanEuler;
         bool posInit;
@@ -119,7 +126,7 @@ namespace Camisa10.UI
             return kitMats[t] = Arena.TexMat(t, Vector2.one, smooth);
         }
 
-        void BuildHuman(HumanModel h, Color shirt, Color shorts, Color socks, Color boots, int number, bool keeper, Kit kit)
+        void BuildHuman(HumanModel h, Color shirt, Color shorts, Color socks, Color boots, int number, bool keeper, Kit kit, BootStyle bootStyle)
         {
             model = h;
             modelRoot = new GameObject("Corpo").transform;
@@ -157,7 +164,14 @@ namespace Camisa10.UI
             M(HumanModel.Part.Sclera, Arena.Mat(new Color(.92f, .9f, .86f), .7f));
             // antebraço: pele, ou manga comprida no goleiro
             M(HumanModel.Part.Forearms, keeper ? (mats[(int)HumanModel.Part.Shirt] ?? skin) : skin);
-            M(HumanModel.Part.Boots, Arena.Mat(boots, .55f));
+            // chuteira com textura nas cores escolhidas (sem estilo: a cor pedida com detalhe contrastante)
+            var bs = bootStyle ?? new BootStyle
+            {
+                c1 = "#" + ColorUtility.ToHtmlStringRGB(boots),
+                c2 = boots.grayscale > .5f ? "#151515" : "#F5F5F5",
+                sole = boots.grayscale > .5f ? "#B0BEC5" : "#222222",
+            };
+            M(HumanModel.Part.Boots, BootModel.Material(bs));
             M(HumanModel.Part.Hands, keeper ? Arena.Mat(Theme.Hex("#F5F5F5"), .2f) : skin);
             M(HumanModel.Part.Hair, Arena.Mat(Hairs[Rng.RangeInt(0, Hairs.Length - 1)], .35f));
 
@@ -198,6 +212,103 @@ namespace Camisa10.UI
             if (cur.sqrMagnitude < 1e-6f) return;
             var rot = Quaternion.FromToRotation(cur, dir);
             b.rotation = Quaternion.Slerp(Quaternion.identity, rot, w) * b.rotation;
+        }
+
+        /// <summary>Comemorações: braços, pernas e corpo de cada gesto (aplicado depois da captura de movimento).</summary>
+        void GestureLayer(float dt, float k, Vector3 up, Vector3 fwd, Vector3 right)
+        {
+            bool on = !string.IsNullOrEmpty(Gesture);
+            wGesture = Mathf.Lerp(wGesture, on ? 1 : 0, k * .6f);
+            gestureTime = on ? gestureTime + dt : 0;
+            gestureLift = 0; gestureLean = Vector3.zero;
+            if (!on || wGesture < .001f) return;
+            float t = gestureTime, w = wGesture;
+            var head = bHead >= 0 ? bones[bHead].position : transform.position + up * 1.6f;
+            var chest = bSpine1 >= 0 ? bones[bSpine1].position : transform.position + up * 1.2f;
+            foreach (var (arm, fore, hand) in new[] { (bLArm, bLFore, bLHand), (bRArm, bRFore, bRHand) })
+            {
+                if (arm < 0) continue;
+                float side = Mathf.Sign(Vector3.Dot(bones[arm].position - transform.position, right));
+                bool rightArm = side > 0;
+                switch (Gesture)
+                {
+                    case "aviao": // braços abertos como asas
+                        Aim(arm, fore, (right * side - up * .12f + fwd * .05f).normalized, w);
+                        Aim(fore, hand, (right * side - up * .05f + fwd * .1f).normalized, w);
+                        break;
+                    case "joelhada": // de joelhos, braços para cima e abertos
+                    {
+                        var d = (up * .85f + right * side * .55f - fwd * .2f).normalized;
+                        Aim(arm, fore, d, w); Aim(fore, hand, d, w);
+                        break;
+                    }
+                    case "soco": // braço direito socando o ar, o outro dobrado
+                        if (rightArm)
+                        {
+                            var d = (up + right * .12f + fwd * .08f).normalized;
+                            Aim(arm, fore, d, w); Aim(fore, hand, d, w);
+                        }
+                        else
+                        {
+                            Aim(arm, fore, (-up * .75f + right * side * .3f + fwd * .2f).normalized, w);
+                            Aim(fore, hand, (up * .6f + fwd * .7f).normalized, w);
+                        }
+                        break;
+                    case "silencio": // dedo na boca, para a torcida adversária
+                        if (rightArm)
+                        {
+                            Aim(arm, fore, (fwd * .5f - up * .55f + right * .4f).normalized, w);
+                            var mouth = head + fwd * .13f + up * .02f;
+                            Aim(fore, hand, (mouth - bones[fore].position).normalized, w);
+                        }
+                        else Aim(arm, fore, (-up + right * side * .15f).normalized, w * .6f);
+                        break;
+                    case "coracao": // mãos juntas formando um coração na frente do peito
+                    {
+                        Aim(arm, fore, (-up * .5f + fwd * .55f + right * side * .45f).normalized, w);
+                        var heart = chest + fwd * .3f + up * .22f;
+                        Aim(fore, hand, (heart - bones[fore].position).normalized, w);
+                        break;
+                    }
+                    case "danca": // cotovelos dobrados, braços alternando no ritmo
+                    {
+                        float b = Mathf.Sin(t * 7f + (rightArm ? 0 : Mathf.PI));
+                        Aim(arm, fore, (-up * .55f + right * side * .55f + fwd * (.2f + .25f * b)).normalized, w);
+                        Aim(fore, hand, (up * .7f + fwd * .45f + right * side * .15f * b).normalized, w);
+                        break;
+                    }
+                    case "abraco": // companheiro chegando de braços abertos
+                        Aim(arm, fore, (fwd * .75f + right * side * .5f + up * .15f).normalized, w);
+                        Aim(fore, hand, (fwd * .6f - right * side * .55f + up * .1f).normalized, w);
+                        break;
+                }
+            }
+            switch (Gesture)
+            {
+                case "aviao": gestureLean = new Vector3(8f, 0, Mathf.Sin(t * 2.4f) * 16f); break;
+                case "joelhada":
+                    // ajoelhado: coxas na vertical, canelas deitadas para trás, tronco para trás
+                    foreach (var (upB, leg, foot) in new[] { (bLUp, bLLeg, bLFoot), (bRUp, bRLeg, bRFoot) })
+                    {
+                        Aim(upB, leg, (-up + fwd * .08f).normalized, w);
+                        Aim(leg, foot, (-fwd - up * .12f).normalized, w);
+                    }
+                    gestureLift = -.44f;
+                    gestureLean = new Vector3(-16f, 0, 0);
+                    break;
+                case "soco":
+                {
+                    float c = Mathf.Repeat(t, 1.15f) / 1.15f;
+                    gestureLift = c < .42f ? Mathf.Sin(c / .42f * Mathf.PI) * .34f : 0;
+                    if (c < .42f) foreach (var (upB, leg) in new[] { (bLUp, bLLeg), (bRUp, bRLeg) }) Aim(upB, leg, (-up + fwd * .35f).normalized, w * Mathf.Sin(c / .42f * Mathf.PI));
+                    break;
+                }
+                case "silencio": gestureLean = new Vector3(5f, 0, 0); break;
+                case "danca":
+                    gestureLift = Mathf.Abs(Mathf.Sin(t * 7f)) * .05f;
+                    gestureLean = new Vector3(0, 0, Mathf.Sin(t * 3.5f) * 9f);
+                    break;
+            }
         }
 
         /// <summary>Velocidade horizontal real do jogador, em m/s.</summary>
@@ -287,17 +398,19 @@ namespace Camisa10.UI
                 float side = Mathf.Sign(Vector3.Dot(bones[arm].position - transform.position, right));
                 if (wReady > .001f)
                 {
-                    Aim(arm, fore, (right * side * .7f - up * .5f + fwd * .45f).normalized, wReady);
-                    Aim(fore, hand, (fwd * .8f + right * side * .3f).normalized, wReady);
+                    // pronto (goleiro, marcador): braço desce à frente do corpo, cotovelo dobrado, mãos na altura da cintura
+                    Aim(arm, fore, (-up * .72f + fwd * .55f + right * side * .3f).normalized, wReady);
+                    Aim(fore, hand, (fwd * .85f + up * .22f + right * side * .12f).normalized, wReady);
                 }
                 if (wArms > .001f)
                 {
                     var dir = (up + right * side * (mode == Mode.Celebrate ? .5f : .2f)).normalized;
-                    // no mergulho os braços esticam juntos na direção da bola
+                    // no mergulho os dois braços esticam juntos, paralelos, do peito na direção da bola
                     if (mode == Mode.Dive && Reach.HasValue)
                     {
-                        var to = Reach.Value - bones[arm].position;
-                        if (to.sqrMagnitude > .01f) dir = Vector3.Slerp(dir, to.normalized, .7f);
+                        var chest = bSpine1 >= 0 ? bones[bSpine1].position : transform.position + up;
+                        var to = Reach.Value - chest;
+                        if (to.sqrMagnitude > .01f) dir = (Vector3.Slerp(up, to.normalized, .75f) + right * side * .06f).normalized;
                     }
                     Aim(arm, fore, dir, wArms);
                     Aim(fore, hand, dir, wArms);
@@ -312,8 +425,10 @@ namespace Camisa10.UI
                 Aim(bRLeg, bRFoot, (-up - fwd * .3f).normalized, wArms * .8f);
             }
 
+            GestureLayer(dt, k, up, fwd, right);
+
             // saltos (barreira, comemoração)
-            float lift = 0;
+            float lift = gestureLift * wGesture;
             if (mode == Mode.Jump)
             {
                 float j = Mathf.Clamp01(modeTime / .45f);
@@ -323,7 +438,7 @@ namespace Camisa10.UI
             else if (mode == Mode.Celebrate) lift = Mathf.Abs(Mathf.Sin(modeTime * 10f)) * .12f;
             else if (mode == Mode.Ready && spd > .25f) lift = Mathf.Abs(Mathf.Sin(modeTime * 13f)) * .045f * Mathf.Clamp01(spd / 2f); // passinhos laterais
             var mp = modelRoot.localPosition;
-            mp.y = Mathf.Lerp(mp.y, lift, mode == Mode.Jump ? 1 : k);
+            mp.y = Mathf.Lerp(mp.y, lift, mode == Mode.Jump || Gesture == "soco" ? 1 : k);
             modelRoot.localPosition = mp;
 
             // corpo inclina como um pêndulo: para a frente ao arrancar e correr, para dentro nas curvas,
@@ -333,6 +448,7 @@ namespace Camisa10.UI
             var leanT = locomote && mode != Mode.Stumble
                 ? new Vector3(Mathf.Clamp(spd * 1.6f + aF * 1.4f, -10f, 16f), 0, Mathf.Clamp(-aR * 2.2f, -16f, 16f))
                 : Vector3.zero;
+            leanT += gestureLean * wGesture;
             leanEuler = Vector3.Lerp(leanEuler, leanT, 1f - Mathf.Exp(-6f * dt));
             float sideMove = spd > .5f ? Vector3.Dot(moveVel / spd, right2) * cycleDir : 0;
             bodyYaw = Mathf.Lerp(bodyYaw, locomote ? Mathf.Clamp(sideMove * (mode == Mode.Ready ? 20f : 55f), -55f, 55f) : 0, 1f - Mathf.Exp(-6f * dt));

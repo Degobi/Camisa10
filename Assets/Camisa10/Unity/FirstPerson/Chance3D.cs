@@ -71,7 +71,9 @@ namespace Camisa10.UI
         readonly Dictionary<Transform, Mover> movers = new Dictionary<Transform, Mover>();
         MatchAudio sfx;
 
-        // cabeceio
+        // cabeceio (salto: o contato acontece quando a bola chega)
+        bool jumpQueued, headDone;
+        float jumpAt;
         Vector3 headPoint;
         bool crossLaunched;
         float crossLaunchAt, windowOpen = -1, windowClose = -1;
@@ -555,16 +557,22 @@ namespace Camisa10.UI
             var start = A.Ball.transform.position;
             float sigma = Mathf.Max(.2f, 1.8f - Stat(Attr.Pas) * .014f);
             var target = new Vector3(groundPoint.x + (float)Rng.Gauss() * sigma, Arena.BallRadius, groundPoint.z + (float)Rng.Gauss() * sigma);
-            float speed = Mathf.Lerp(14f, 22f, power01);
+            float dist = HorizDist(start, target);
+            float speed = Mathf.Clamp(dist * .9f + 4f, 9f, 20f) * Mathf.Lerp(.9f, 1.15f, power01);
             curveAccel = 0;
             passFlight = true;
             mateTarget = Flat(target);
-            passArrive = Time.time + Mathf.Max(.25f, HorizDist(start, target) / speed);
             carry = false;
             hud.HideControls();
             kickT = 0;
             sfx?.Kick(.45f);
-            Launch(start, target, speed);
+            // passe rasteiro: a bola rola no chão (freia pela grama), não sai pelo alto
+            A.Ball.isKinematic = false;
+            A.Ball.position = new Vector3(start.x, Arena.BallRadius, start.z);
+            A.Ball.linearVelocity = Flat(target - start).normalized * speed;
+            ballSpin = Vector3.zero;
+            prevBall = start;
+            passArrive = Time.time + Mathf.Max(.25f, dist / (speed * .85f));
             shotTime = Time.time;
             phase = Phase.Flight;
             hud.SetHint("");
@@ -616,6 +624,7 @@ namespace Camisa10.UI
             if (A == null) return;
             float dt = Time.deltaTime;
             A.FitCamera();
+            if (celebrating) return; // a comemoração conduz a cena
             if (kickT >= 0) kickT += dt;
             if (phase == Phase.Aim && Time.time < introUntil) { PlaceFoot(); IntroRun(); return; }
             hud.EndIntro();
@@ -710,6 +719,9 @@ namespace Camisa10.UI
             var v = A.Ball.linearVelocity;
             if (v.sqrMagnitude < .04f) return;
             A.Ball.AddForce(BallPhysics.ExtraAccel(v, ballSpin, A.Ball.position.y), ForceMode.Acceleration);
+            var ang = A.Ball.angularVelocity;
+            var roll = BallPhysics.Rolling(v, A.Ball.position.y, ref ang);
+            if (roll != Vector3.zero) { A.Ball.AddForce(roll, ForceMode.Acceleration); A.Ball.angularVelocity = ang; ballSpin *= .9f; }
             ballSpin *= .996f; // o giro diminui aos poucos
         }
 
@@ -736,12 +748,19 @@ namespace Camisa10.UI
             bool sprint = wantSprint && !sprintTired;
             stamina = Mathf.Clamp01(stamina + (sprint ? -.16f : stk.sqrMagnitude > .04f ? .09f : .14f) * dt);
             hud.SetStamina(stamina);
+            hud.SprintOn(sprint);
             float dri01 = Mathf.Clamp01((Stat(Attr.Dri) - 40f) / 55f);
 
             // o joystick é relativo à câmera, que sempre olha para o gol: para cima = em direção ao gol
             var want = new Vector3(st.x, 0, st.y);
             if (autoRun) want.z = Mathf.Max(want.z, .45f);
             if (want.sqrMagnitude > 1f) want.Normalize();
+            if (sprint)
+            {
+                // arrancada é sempre no máximo: na direção do joystick ou, sem joystick, reto para o gol
+                var toGoalDir = Flat(Vector3.zero - me).normalized;
+                want = want.sqrMagnitude > .02f ? want.normalized : toGoalDir;
+            }
 
             var b = Flat(A.Ball.transform.position);
             var toBall = b - me;
@@ -777,7 +796,8 @@ namespace Camisa10.UI
                 // toque: empurra a bola para onde o joystick aponta; em velocidade o toque é mais longo
                 var dirT = want.sqrMagnitude > .01f ? want.normalized : carryVel.normalized;
                 // mudando de direção o toque é curto: só a velocidade que já vai para o novo lado empurra a bola
-                float push = Mathf.Max(Vector3.Dot(carryVel, dirT), 1.8f) * (sprint ? 1.32f : 1.22f) * R(.95f, 1.08f);
+                // toque na corrida: a bola vai um pouco à frente (na arrancada um pouco mais), sem fugir do pé
+                float push = Mathf.Max(Vector3.Dot(carryVel, dirT), 1.8f) * (sprint ? 1.2f : 1.15f) * R(.97f, 1.05f);
                 var perp = new Vector3(dirT.z, 0, -dirT.x);
                 ballVel = dirT * push + perp * (float)Rng.Gauss() * (sprint ? .45f : .2f) * (1.2f - dri01);
                 lastTouch = touchAt = Time.time;
@@ -1024,7 +1044,22 @@ namespace Camisa10.UI
                 var look = Vector3.Lerp(new Vector3(0, 1.3f, 0), A.Ball.transform.position, .5f);
                 A.Cam.transform.rotation = Quaternion.Slerp(A.Cam.transform.rotation, Quaternion.LookRotation(look - A.Cam.transform.position), 4f * Time.deltaTime);
             }
-            if (Time.time > windowClose + .15f)
+            // contato na hora em que a bola chega; a qualidade é o pico do salto casando com a chegada
+            if (jumpQueued && !headDone && Time.time >= headArrive - .015f)
+            {
+                headDone = true;
+                float peak = jumpAt + .28f;
+                float q = Mathf.Clamp01(1f - Mathf.Abs(peak - headArrive) / .32f);
+                if (q < .12f)
+                {
+                    if (defending) AttackerHeads(peak < headArrive ? "SUBIU CEDO DEMAIS" : "SUBIU ATRASADO");
+                    else Finish(LiveOutcome.Missed, peak < headArrive ? "SUBIU CEDO DEMAIS" : "SUBIU ATRASADO");
+                }
+                else if (defending) CorteContact(q);
+                else HeaderContact(q);
+                return;
+            }
+            if (Time.time > windowClose + .15f && !headDone)
             {
                 if (defending) AttackerHeads("A BOLA PASSOU POR VOCÊ");
                 else Finish(LiveOutcome.Missed, "A BOLA PASSOU");
@@ -1066,9 +1101,40 @@ namespace Camisa10.UI
                 A.Ball.transform.position = Flat(mate.position) + mate.forward * .6f + Vector3.up * (crossPass ? 1.85f : Arena.BallRadius);
                 if (crossPass) Rig(mate).Set(PersonRig.Mode.Jump);
                 phase = Phase.Watch;
-                StartCoroutine(MateShoot());
+                // tabela: o companheiro devolve de primeira no espaço à sua frente (só uma vez por lance)
+                bool tabela = !crossPass && !tabelaDone && (type == "meio" ? Rng.Chance(.65) : Rng.Chance(.35));
+                if (tabela) StartCoroutine(ReturnPass());
+                else StartCoroutine(MateShoot());
             }
             else Finish(LiveOutcome.PassIntercepted);
+        }
+
+        bool tabelaDone;
+
+        /// <summary>Tabela: o companheiro devolve rasteiro na frente do jogador, que volta a conduzir e decide.</summary>
+        IEnumerator ReturnPass()
+        {
+            tabelaDone = true;
+            yield return new WaitForSeconds(.4f);
+            if (phase != Phase.Watch) yield break;
+            mateHasBall = false;
+            var from = Flat(mate.position) + mate.forward * .6f;
+            var toGoal = Flat(Vector3.zero - me).normalized;
+            var spot = me + toGoal * R(4.5f, 6.5f) + new Vector3(toGoal.z, 0, -toGoal.x) * R(-1.5f, 1.5f);
+            spot.z = Mathf.Min(spot.z, -7f);
+            A.Ball.isKinematic = true;
+            SetBall(from);
+            ballVel = Flat(spot - from).normalized * Mathf.Clamp(HorizDist(from, spot) * 1.1f, 7f, 15f);
+            lastTouch = Time.time;
+            sfx?.Touch(.5f);
+            carry = true; phase = Phase.Aim; passFlight = false;
+            startTime = Time.time; aimTimeout = Mathf.Max(aimTimeout, 10f);
+            hud.Controls(true, true, false, pressers.Count > 0, true, false);
+            hud.Finesse.gameObject.SetActive(true);
+            hud.Banner("TABELA!", Theme.FeedGold);
+            StartCoroutine(HideBanner(.6f));
+            AddPoints("Tabela", 3);
+            mateTarget = Flat(mate.position) + toGoal * 6f; // ele segue para a área
         }
 
         IEnumerator MateShoot()
@@ -1243,7 +1309,9 @@ namespace Camisa10.UI
 
         IEnumerator End(LiveOutcome o)
         {
-            yield return new WaitForSeconds(1.9f);
+            // gol seu: comemoração em terceira pessoa (o passe para o gol do companheiro só tem o grito)
+            if (o == LiveOutcome.Goal && !defending) yield return Celebration();
+            else yield return new WaitForSeconds(1.9f);
             var cb = onDone;
             onDone = null;
             cb?.Invoke(o);

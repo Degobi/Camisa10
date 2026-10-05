@@ -24,13 +24,13 @@ namespace Camisa10.EditorTools
             EditorApplication.update += Tick;
         }
 
-        static readonly string[] Types = { "penalti", "falta", "chance", "cabeceio", "corte", "cruzamento", "rebote", "cara", "contra", "meio", "defesa" };
+        static readonly string[] Types = { "penalti", "falta", "chance", "cabeceio", "corte", "cruzamento", "rebote", "cara", "contra", "meio", "defesa", "gol" }; // "gol": lance de chance encerrado como gol (comemoração completa)
         static int index, errors;
         static float stepAt;
         static int stage;
         static ChanceHud hud;
         static Chance3D chance;
-        static bool done, skillTried;
+        static bool done, skillTried, celebrated;
         static readonly List<string> report = new List<string>();
         static GameObject canvasGo;
 
@@ -67,6 +67,20 @@ namespace Camisa10.EditorTools
                 return;
             }
             float t = Time.time - stepAt;
+            if (Types[index] == "gol")
+            {
+                if (stage == 0 && t > 1.6f) { chance.TestGoal(); stage = 2; stepAt = Time.time; return; }
+                if (stage == 2 && !done && hud.SkipBtn.gameObject.activeSelf && !celebrated) { celebrated = true; report.Add("    gol: comemoração começou"); }
+                if (stage == 2 && (done || t > 16f))
+                {
+                    if (!done) { errors++; report.Add("ERRO em 'gol': a comemoração não terminou em 16 s"); }
+                    if (!celebrated) { errors++; report.Add("ERRO em 'gol': a comemoração não apareceu"); }
+                    if (chance != null) Object.Destroy(chance.gameObject);
+                    hud?.Destroy();
+                    Finish();
+                }
+                return;
+            }
             switch (stage)
             {
                 case 0 when t > 1.6f && System.Array.IndexOf(new[] { "chance", "cara", "contra", "meio", "cruzamento", "rebote" }, Types[index]) >= 0 && !skillTried:
@@ -88,8 +102,13 @@ namespace Camisa10.EditorTools
                 case 1 when Types[index] != "cabeceio" && Types[index] != "corte" && t > .7f:
                     hud.Shoot.OnRelease?.Invoke();
                     stage = 2; stepAt = Time.time; break;
-                case 2 when done || t > 8f:
-                    if (!done) { errors++; report.Add($"ERRO em '{Types[index]}': o lance não terminou em 8 s"); }
+                case 2 when !done && hud.SkipBtn.gameObject.activeSelf:
+                    // gol: a comemoração do pênalti roda inteira; nas outras o teste aperta PULAR
+                    if (!celebrated) { celebrated = true; report.Add($"    {Types[index]}: comemoração começou"); }
+                    if (Types[index] != "penalti" && Time.time - stepAt > 4f) hud.SkipBtn.OnPress?.Invoke();
+                    break;
+                case 2 when done || t > 16f:
+                    if (!done) { errors++; report.Add($"ERRO em '{Types[index]}': o lance não terminou em 16 s"); }
                     if (chance != null) Object.Destroy(chance.gameObject);
                     hud?.Destroy();
                     index++;
@@ -102,8 +121,8 @@ namespace Camisa10.EditorTools
         static void StartNext()
         {
             var game = Game.NewCareer("Teste", "ATA", new[] { 4, 4, 3, 3, 3, 3 });
-            var match = new MatchEngine(game) { Current = new Moment { Type = Types[index], Text = "Teste automático", Options = new MomentOption[0] } };
-            done = false; stage = 0; stepAt = Time.time; skillTried = false;
+            var match = new MatchEngine(game) { Current = new Moment { Type = Types[index] == "gol" ? "chance" : Types[index], Text = "Teste automático", Options = new MomentOption[0] } };
+            done = false; stage = 0; stepAt = Time.time; skillTried = false; celebrated = false;
             hud = ChanceHud.Build(canvasGo.transform);
             string type = Types[index];
             chance = Chance3D.Play(null, game, match, hud, o => { done = true; report.Add($"ok  {type,-9} → {o}"); });

@@ -1,4 +1,5 @@
 using System.IO;
+using Camisa10.Core;
 using Camisa10.UI;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -70,6 +71,12 @@ namespace Camisa10.EditorTools
                 sheet.Apply();
                 File.WriteAllBytes(Path.Combine(dir, "trofeus.png"), sheet.EncodeToPNG());
             }
+            foreach (var (nm, st) in new[] { ("volt", new BootStyle { c1 = "#F2C230", c2 = "#111111", sole = "#FFFFFF" }), ("preta", new BootStyle { c1 = "#111111", c2 = "#FFFFFF", sole = "#222222" }), ("kairos", new BootStyle { c1 = "#00ACC1", c2 = "#0D47A1", sole = "#B0BEC5" }) })
+            {
+                var ph = BootModel.Photo(st);
+                if (ph != null) SaveTex(ph.texture, Path.Combine(dir, "chuteira-" + nm + ".png"));
+            }
+            SaveTex(BootModel.Texture(new BootStyle { c1 = "#F2C230", c2 = "#111111", sole = "#FFFFFF" }), Path.Combine(dir, "chuteira-textura.png"));
             SaveTex(KitArt.Shirt(Kit.For("Palmeiras", "#006437", "#FFFFFF"), 27), Path.Combine(dir, "camisa-palmeiras.png"));
             SaveTex(KitArt.Shirt(Kit.For("Vasco da Gama", "#111111", "#FFFFFF"), 10), Path.Combine(dir, "camisa-vasco.png"));
             if (!string.IsNullOrEmpty(previous)) EditorSceneManager.OpenScene(previous);
@@ -86,6 +93,9 @@ namespace Camisa10.EditorTools
             t.GetMethod("BuildShell", flags).Invoke(app, null);
             var game = Camisa10.Core.Game.NewCareer("Gabriel Souza", "ATA", new[] { 4, 4, 3, 3, 3, 3 });
             game.S.owned.Add("carro1"); // mostra um item comprado na vitrine
+            game.StartDating(); game.S.love.stage = 2; game.S.love.affection = 72; // vida pessoal preenchida
+            game.S.rival.goals = 3; game.S.season.stats.goals = 4;
+            typeof(Camisa10.Core.Game).GetMethod("PayWeek", flags).Invoke(game, new object[] { 1 }); // extrato de uma rodada com gol
             game.S.titles.AddRange(new[] { "Campeão do Brasileirão 2026", "Campeão da Copa do Brasil 2026", "Campeão da Copa do Mundo 2026", "Campeão da Premier League 2028" });
             game.S.awards.AddRange(new[] { "Bola de Ouro 2027", "Artilheiro do Brasileirão 2026 (21 gols)", "Craque do Brasileirão 2026" });
             t.GetField("game", flags).SetValue(app, game);
@@ -100,7 +110,7 @@ namespace Camisa10.EditorTools
             canvas.planeDistance = 1;
             var scaler = go.GetComponentInChildren<UnityEngine.UI.CanvasScaler>();
 
-            foreach (var tab in new[] { "home", "player", "life", "settings", "trophies" })
+            foreach (var tab in new[] { "home", "player", "life", "agenda", "settings", "trophies" })
             {
                 t.GetField("tab", flags).SetValue(app, tab);
                 t.GetMethod("Render", flags).Invoke(app, new object[] { true });
@@ -193,9 +203,18 @@ namespace Camisa10.EditorTools
             diver.rotation = Quaternion.LookRotation(Vector3.back) * Quaternion.Euler(0, 0, 70);
             diver.GetComponent<PersonRig>().Set(PersonRig.Mode.Dive);
             mate.GetComponent<PersonRig>().Set(PersonRig.Mode.Run, 6);
+            // comemorações lado a lado (de frente para a câmera)
+            string[] gestures = { "aviao", "joelhada", "soco", "silencio", "coracao", "danca", "abraco" };
+            for (int i = 0; i < gestures.Length; i++)
+            {
+                var c = a.Person("Comemora-" + gestures[i], Kit.For("Flamengo", "#C8102E", "#111111"), new Vector3(-9 + i * 3f, 0, -75), 180,
+                    new BootStyle { c1 = "#F2C230", c2 = "#111111", sole = "#FFFFFF" }, 10);
+                var cr = c.GetComponent<PersonRig>();
+                cr.Set(PersonRig.Mode.Pose); cr.Gesture = gestures[i];
+            }
 
             foreach (var rig in Object.FindObjectsByType<PersonRig>())
-                for (int i = 0; i < 12; i++) rig.Tick(1 / 30f);
+                for (int i = 0; i < 40; i++) rig.Tick(1 / 30f);
 
             var rt = new RenderTexture(W, H, 24) { antiAliasing = 4 };
             a.Cam.targetTexture = rt;
@@ -221,8 +240,26 @@ namespace Camisa10.EditorTools
             Shot("3-estadio", new Vector3(14, 1.7f, -30), new Vector3(-10, 4f, 0));
             Shot("4-jogador", mate.position + new Vector3(1.6f, 1.4f, 2.2f), mate.position + Vector3.up * 1f);
             Shot("5-uniformes", new Vector3(0, 1.5f, -66.5f), new Vector3(0, 1.1f, -60));
+            // goleiro com o código do jogo: posicionado e no meio do mergulho (relógio avançado na mão)
+            {
+                float clock = 0;
+                Goalkeeper.Now = () => clock;
+                var gkT = a.Person("GoleiroTeste", Kit.Goalkeeper("#FF7A1A"), new Vector3(20, 0, -40.7f), 180);
+                var gkRig = gkT.GetComponent<PersonRig>();
+                var gkB = new Goalkeeper(gkT, .55f);
+                var fakeBall = new Vector3(20, 0, -58);
+                for (int i = 0; i < 30; i++) { clock += 1 / 30f; gkB.Position(fakeBall, 1 / 30f, .7f); gkRig.Tick(1 / 30f); }
+                Shot("10-goleiro-pronto", new Vector3(20.6f, 1.3f, -44f), new Vector3(20, 1f, -40.7f));
+                gkB.OnShot(fakeBall, new Vector3(2.4f, 1.2f, 22f), 0, false);
+                for (int i = 0; i < 21; i++) { clock += 1 / 30f; gkB.Tick(1 / 30f); gkRig.Tick(1 / 30f); }
+                Shot("11-goleiro-mergulho", new Vector3(20.5f, 1.3f, -45f), new Vector3(21.2f, 1f, -40.7f));
+                Goalkeeper.Now = () => Time.time;
+            }
             Shot("9-rosto", new Vector3(-5.05f, 1.68f, -59.35f), new Vector3(-5f, 1.66f, -60f));
             Shot("5b-uniformes-perto", new Vector3(-4, 1.4f, -62.6f), new Vector3(-4, 1.15f, -60));
+            Shot("13-comemoracoes", new Vector3(0, 1.3f, -86f), new Vector3(0, .9f, -75f));
+            Shot("12-chuteira-pe", new Vector3(-6.45f, .32f, -61.0f), new Vector3(-7f, .07f, -60f));
+            Shot("12b-chuteira-lado", new Vector3(-5.9f, .25f, -60.1f), new Vector3(-6.9f, .07f, -60f));
             // rede estufada com a bola lá dentro e torcida comemorando (aplica um quadro da animação na mão)
             var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
             if (a.NearNet != null) { a.NearNet.Hold(new Vector3(1.2f, 1.1f, 2f), .5f); typeof(GoalNet).GetMethod("Update", flags).Invoke(a.NearNet, null); }

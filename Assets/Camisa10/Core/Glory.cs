@@ -18,9 +18,9 @@ namespace Camisa10.Core
     /// </summary>
     public partial class Game
     {
-        // rodadas depois das quais acontece cada fase da copa, a data de seleções e o prêmio do mês
-        public static readonly int[] CupWeeks = { 4, 8, 12, 16 };
-        public static readonly int[] NationalWeeks = { 6, 12 };
+        // rodadas depois das quais acontece cada fase da copa e as datas de seleções (o prêmio do mês sai a cada 4 rodadas)
+        public static readonly int[] CupWeeks = { 8, 16, 24, 32 };
+        public static readonly int[] NationalWeeks = { 12, 26 };
         public static readonly string[] CupStages = { "Oitavas de final", "Quartas de final", "Semifinal", "Final" };
 
         public static string CupName(string league) => League(league)?.Cup ?? "Copa Nacional";
@@ -119,11 +119,8 @@ namespace Camisa10.Core
             var se = S.season;
             ScorersRound();
             int week = se.week + 1; // rodadas já jogadas
-            if (Array.IndexOf(CupWeeks, week) >= 0)
-            {
-                MonthAward(week);
-                if (!se.cupOut && !se.cupWon) PlayCupTie();
-            }
+            if (week % 4 == 0) MonthAward(week); // um "mês" a cada 4 rodadas
+            if (Array.IndexOf(CupWeeks, week) >= 0 && !se.cupOut && !se.cupWon) PlayCupTie();
             if (Array.IndexOf(NationalWeeks, week) >= 0) NationalWindow();
             CheckAchievements(m);
         }

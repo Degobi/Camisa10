@@ -216,18 +216,36 @@ namespace Camisa10.UI
             gk.OnShot(start, A.Ball.linearVelocity, curve, type == "falta" || blockers.Count > 0, guess, target);
         }
 
-        /// <summary>Cabeceio: a qualidade depende de acertar a hora (anel) e a mira foi arrastada antes.</summary>
+        /// <summary>Cabeceio/corte: aperte para saltar; o contato acontece quando a bola chega (ver CrossStep).</summary>
         void HeaderButton()
         {
-            if (!crossLaunched || Time.time < windowOpen - .05f) { Finish(LiveOutcome.Missed, "FORA DO TEMPO"); return; }
-            if (Time.time > windowClose) return;
-            float off = Mathf.Abs(Time.time - headArrive);
-            float q = Mathf.Clamp01(1f - off / .3f); // 1 = tempo perfeito
-            A.Ball.isKinematic = true;
-            A.Ball.transform.position = headPoint;
+            if (!crossLaunched || jumpQueued) return;
+            jumpQueued = true;
+            jumpAt = Time.time;
+            StartCoroutine(JumpCamera());
+        }
+
+        /// <summary>Salto: a câmera (seus olhos) sobe e desce em ~0,56 s.</summary>
+        System.Collections.IEnumerator JumpCamera()
+        {
+            var basePos = A.Cam.transform.position;
+            float t0 = Time.time;
+            while (Time.time - t0 < .56f && A != null)
+            {
+                float u = (Time.time - t0) / .56f;
+                var p = A.Cam.transform.position;
+                A.Cam.transform.position = new Vector3(p.x, basePos.y + Mathf.Sin(u * Mathf.PI) * .42f, p.z);
+                yield return null;
+            }
+        }
+
+        /// <summary>Cabeçada no tempo: mira arrastada antes, força e precisão pela qualidade do salto.</summary>
+        void HeaderContact(float q)
+        {
             float acc = (Stat(Attr.Fin) + Stat(Attr.Fis)) / 2f * Mathf.Lerp(.55f, 1.12f, q);
             if (q > .75f) { hud.Banner("NA MEDIDA!", Theme.FeedGold); StartCoroutine(HideBanner(.5f)); }
-            FireShot(aimPoint, Mathf.Lerp(.35f, .75f, q), Vector3.zero, acc, .72f);
+            sfx?.Kick(.5f, true);
+            FireShot(aimPoint, Mathf.Lerp(.35f, .78f, q), new Vector3(Mathf.Lerp(2f, 6f, q), 0, 0), acc, .72f);
         }
 
         // ---------- goleiro na hora do cruzamento da linha ----------

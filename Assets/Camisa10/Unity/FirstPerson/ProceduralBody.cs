@@ -143,10 +143,7 @@ namespace Camisa10.UI
             Both(body, E(Vector3.Lerp(r.LLeg, r.LFoot, .27f) + new Vector3(0, 0, -.033f), new Vector3(.054f, .12f, .05f), .03f));
             Both(body, E(r.LFoot, new Vector3(.036f, .036f, .036f), .02f));
 
-            // chuteira: corpo achatado do calcanhar ao bico, cano curto, sola reta
-            var heel = r.LFoot + new Vector3(0, -.04f, -.07f); var toe = r.LToeEnd + new Vector3(0, .02f, -.005f);
-            Both(boots, E(Vector3.Lerp(heel, toe, .5f) + new Vector3(0, .028f, 0), new Vector3(.05f, .045f, (toe.z - heel.z) * .52f), .02f));
-            Both(boots, C(r.LFoot + new Vector3(0, -.01f, -.012f), r.LFoot + new Vector3(0, .045f, -.012f), .043f, .039f, .02f));
+            // a chuteira é uma malha à parte (BootModel); a perna termina fechada dentro do cano
 
             // cabeça
             var h = r.Head;
@@ -190,9 +187,7 @@ namespace Camisa10.UI
             float hd = Union(head, p, 10f);
             d = Smin(d, hd, .025f);
             tag = Tag.Body;
-            float bd = Union(boots, p, 10f);
-            bd = Mathf.Max(bd, -p.y - .002f); // sola reta no chão
-            if (bd < d) { d = bd; tag = Tag.Boots; }
+            d = Smax(d, rg.BootTop - .054f - p.y, .008f); // perna fechada dentro da chuteira
             float ed = 10f;
             foreach (var s in eyes) ed = Mathf.Min(ed, s.Eval(p));
             if (ed < d) { d = ed; tag = Tag.Eyes; }
@@ -582,6 +577,22 @@ namespace Camisa10.UI
                 Blob(new Vector3(r.Head.x + sx * .031f, r.Head.y + .089f, browZ + .0006f), new Vector3(.0185f, .0033f, .0035f), (int)HumanModel.Part.Hair, -sx * 7f);
             }
 
+            // chuteiras em alta resolução, presas ao pé e ao osso dos dedos (o bico dobra junto)
+            foreach (bool right in new[] { false, true })
+            {
+                var g = BootModel.Build(r.LFoot, r.LToeEnd.z, right);
+                int fb = h.Bone(right ? "RightFoot" : "LeftFoot"), tb = h.Bone(right ? "RightToeBase" : "LeftToeBase");
+                int bs = outV.Count;
+                for (int i = 0; i < g.V.Count; i++)
+                {
+                    float wt = tb < 0 ? 0 : Mathf.SmoothStep(0, 1, Mathf.InverseLerp(r.LToe.z - .03f, r.LToe.z + .015f, g.V[i].z));
+                    outV.Add(g.V[i]); outN.Add(g.N[i]); outUV.Add(g.UV[i]);
+                    outW.Add(wt <= 0 ? new BoneWeight { boneIndex0 = fb, weight0 = 1 }
+                        : new BoneWeight { boneIndex0 = tb, weight0 = wt, boneIndex1 = fb, weight1 = 1 - wt });
+                }
+                foreach (int t in g.T) tris[(int)HumanModel.Part.Boots].Add(bs + t);
+            }
+
             var mesh = new Mesh { name = "CorpoProcedural", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32, hideFlags = HideFlags.DontUnloadUnusedAsset };
             mesh.SetVertices(outV); mesh.SetNormals(outN); mesh.SetUVs(0, outUV);
             mesh.boneWeights = outW.ToArray();
@@ -596,7 +607,7 @@ namespace Camisa10.UI
 
         // ---------- arquivo pré-gerado (Resources/Modelos/corpo.bytes) ----------
         /// <summary>Suba quando mudar a modelagem: o editor gera o arquivo de novo e o jogo ignora o antigo.</summary>
-        public const int ModelVersion = 1;
+        public const int ModelVersion = 2;
 
         /// <summary>Salva a malha gerada para o jogo só carregar (gerar leva alguns segundos no celular).</summary>
         public static byte[] Serialize(Mesh m, int boneCount)

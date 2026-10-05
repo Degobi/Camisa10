@@ -70,6 +70,22 @@ namespace Camisa10.UI
             return p;
         }
 
+        /// <summary>
+        /// Rolando na grama: resistência ao rolamento (a bola desacelera e para) e giro coerente com o rolar.
+        /// Devolve a aceleração extra e corrige o giro.
+        /// </summary>
+        public static Vector3 Rolling(Vector3 v, float height, ref Vector3 angular)
+        {
+            if (height > BallRadiusPlus || Mathf.Abs(v.y) > .6f) return Vector3.zero;
+            var flat = new Vector3(v.x, 0, v.z);
+            float sp = flat.magnitude;
+            if (sp < .02f) return -flat * 4f;
+            // rolando, a bola gira sem escorregar: ω = (up × v) / r
+            angular = Vector3.Lerp(angular, Vector3.Cross(Vector3.up, flat) / .11f, .2f);
+            return -flat / sp * RollFriction * 9.81f * (sp < 1.2f ? 1.6f : 1f);
+        }
+        const float BallRadiusPlus = .14f, RollFriction = .07f; // grama cortada: ~0,06-0,08
+
         /// <summary>Curva lateral média (m/s²) que um giro produz, para o goleiro estimar.</summary>
         public static float LateralAccel(Vector3 spin, float speed) => Magnus * spin.y * speed * .8f;
     }

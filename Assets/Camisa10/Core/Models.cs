@@ -20,6 +20,7 @@ namespace Camisa10.Core
         public long money;
         public List<float> form = new List<float>();
         public BootStyle boot = new BootStyle();
+        public string celebration = ""; // comemoração escolhida ("" = uma diferente a cada gol)
         public int Get(Attr a) => attrs[(int)a];
     }
 
@@ -91,6 +92,24 @@ namespace Camisa10.Core
     [Serializable] public class CupTie { public int stage; public string opp, c1, c2; public int gf, ga, myGoals; public bool won, pens, home; }
     [Serializable] public class RankRow { public string name, club; public float score; public bool me; }
 
+    // ---------- vida fora de campo ----------
+    /// <summary>Relacionamento: 0 solteiro, 1 ficando, 2 namorando, 3 noivos, 4 casados.</summary>
+    [Serializable] public class Relationship { public string name = "", job = ""; public int stage, weeks; public float affection = 50; public bool famous; }
+
+    /// <summary>Rival fora de campo: outro jovem da mesma posição, comparado com você pela imprensa.</summary>
+    [Serializable] public class Rival { public string name = "", club = ""; public int age, goals, careerGoals, duels, won; public float heat; }
+
+    /// <summary>Extrato da última rodada: o que entrou e o que saiu da conta.</summary>
+    [Serializable]
+    public class Statement
+    {
+        public long salary, bonus, sponsors, business, tax, agent, living, upkeep, partner;
+        public float taxRate;
+        public long Income => salary + bonus + sponsors + business;
+        public long Expenses => tax + agent + living + upkeep + partner;
+        public long Net => Income - Expenses;
+    }
+
     [Serializable] public class CareerRecord { public int year, rank, apps, goals, assists; public string club, c1, c2; public float avg; }
     [Serializable] public class News { public string when, text; }
 
@@ -110,7 +129,7 @@ namespace Camisa10.Core
     [Serializable]
     public class GameState
     {
-        public const int CurrentVersion = 2;
+        public const int CurrentVersion = 3;
         public int version = CurrentVersion, year;
         // identidade e controle de versão do save: base para sincronizar com um servidor no modo online
         public string profileId;          // id único e permanente desta carreira
@@ -138,5 +157,10 @@ namespace Camisa10.Core
         public WorldCupState wc = new WorldCupState();
         public int worldCups; // Copas disputadas
         public string interestLeague; // liga que mandou sondagem (garante proposta dela no fim da temporada)
+        public Relationship love = new Relationship();
+        public Rival rival = new Rival();
+        public Statement lastWeek = new Statement();
+        public long seasonNet;  // saldo acumulado na temporada (salário e negócios menos impostos e despesas)
+        public int debtWeeks;   // rodadas seguidas no vermelho
     }
 }

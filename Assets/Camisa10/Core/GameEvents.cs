@@ -195,9 +195,83 @@ namespace Camisa10.Core
                 Opt("Sorrir e acenar", x => { var p = x.S.player; p.fame += 3; p.moral += 1; return "Classe. Até torcedores rivais elogiaram."; }))),
 
             // ---------- vida pessoal ----------
-            (g => g.S.player.age >= 22 && g.S.player.moral >= 55, .3, g => Ev("Pedido de casamento", "Você está pensando em pedir sua namorada em casamento no gramado, depois do jogo.",
-                Opt("Pedir no gramado", x => { var p = x.S.player; p.moral += 15; p.fame += 4; p.energy -= 5; return "Ela disse SIM! O estádio inteiro aplaudiu."; }),
-                Opt("Pedir num jantar a dois", x => { x.S.player.moral += 12; return "Ela disse sim, num momento só de vocês."; }))),
+            (g => g.S.love.stage == 2 && g.S.love.weeks >= 24 && g.S.love.affection >= 60, .8, g => Ev("Pedido de casamento", $"Você está pensando em pedir {g.S.love.name} em casamento no gramado, depois do jogo.",
+                Opt("Pedir no gramado", x => { var p = x.S.player; p.moral += 15; p.fame += 4; p.energy -= 5; x.S.love.stage = 3; x.S.love.weeks = 0; x.S.love.affection += 15; return "Ela disse SIM! O estádio inteiro aplaudiu."; }),
+                Opt("Pedir num jantar a dois", x => { x.S.player.moral += 12; x.S.love.stage = 3; x.S.love.weeks = 0; x.S.love.affection += 12; return "Ela disse sim, num momento só de vocês."; }),
+                Opt("Ainda não é a hora", x => { x.S.love.affection -= 8; return "Você guardou o anel na gaveta."; }))),
+
+            // ---------- namoro ----------
+            (g => g.S.love.stage == 0 && g.S.player.fame >= 4, .7, g => {
+                var (job, famous) = Rng.Pick(LifeData.PartnerJobs); string name = Rng.Pick(LifeData.PartnerNames);
+                return Ev("Mensagem no direct", $"{name}, {job}, respondeu seu story e puxou conversa.",
+                    Opt("Chamar para sair", x => { x.S.love = new Relationship { name = name, job = job, famous = famous, stage = 1, affection = 58 }; x.S.player.moral += 4;
+                        return $"Vocês marcaram um café. Rolou química com {name}."; }),
+                    Opt("Focar no futebol", x => { x.S.player.coach += 1; return "Agora a cabeça está no campeonato."; })); }),
+
+            (g => g.S.love.stage == 1 && g.S.love.weeks >= 4 && g.S.love.affection >= 50, 1.2, g => Ev("Assumir o namoro?", $"{g.S.love.name} quer saber o que vocês são. Os paparazzi já fotografaram os dois juntos.",
+                Opt("Assumir nas redes", x => { var l = x.S.love; l.stage = 2; l.weeks = 0; l.affection += 12; x.S.player.moral += 6; if (l.famous) x.S.player.fame += 3;
+                    return l.famous ? "O post bombou: o casal virou assunto nacional." : "Namoro assumido. A torcida aprovou o casal."; }),
+                Opt("Manter discreto", x => { x.S.love.affection -= 10; return "Ela aceitou, mas não gostou muito."; }),
+                Opt("Terminar", x => { x.S.love = new Relationship(); x.S.player.moral -= 3; return "Você preferiu ficar solteiro."; }))),
+
+            (g => g.S.love.stage >= 2, .7, g => Ev("Aniversário na véspera do jogo", $"O aniversário da {g.S.love.name} é hoje à noite. O jogo é amanhã cedo.",
+                Opt("Ir à festa até tarde", x => { var p = x.S.player; x.S.love.affection += 15; p.energy -= 15;
+                    if (Rng.Chance(.3)) { p.coach -= 6; return "Ela amou, mas o técnico soube que você chegou de madrugada."; }
+                    return "Ela amou a surpresa e ninguém do clube ficou sabendo."; }),
+                Opt("Passar rapidinho", x => { x.S.love.affection += 4; x.S.player.energy -= 4; return "Você deu um beijo, entregou o presente e foi dormir."; }),
+                Opt("Ficar concentrado", x => { x.S.love.affection -= 14; x.S.player.coach += 2; return "Ela ficou chateada. Vai precisar compensar."; }))),
+
+            (g => g.S.love.stage >= 2 && g.S.player.fame >= 15, .6, g => Ev("Ciúmes nas redes", $"Uma torcedora comentou num post seu e {g.S.love.name} viu.",
+                Opt("Conversar com calma", x => { x.S.love.affection += 4; return "Papo franco. Ficou tudo bem."; }),
+                Opt("Apagar o comentário", x => { x.S.love.affection += 2; x.S.player.fame -= .5f; return "Resolvido, mas virou print em página de fofoca."; }),
+                Opt("Não dar importância", x => { x.S.love.affection -= 12; return "Ela achou que você não se importou. Clima pesado em casa."; }))),
+
+            (g => g.S.love.stage == 2 && g.S.love.weeks >= 12 && g.S.player.money >= 30000, .6, g => {
+                long v = Game.R1000(Math.Max(15000, g.S.contract.salary * 1.5));
+                return Ev("Morar juntos", $"{g.S.love.name} propõe que vocês morem juntos. Mudança e móveis novos: {Fmt.Money(v)}.",
+                    Opt("Bora", x => { x.S.player.money -= v; x.S.love.affection += 15; x.S.player.moral += 6; return "Casa nova, vida nova. Vocês estão felizes."; }),
+                    Opt("Ainda é cedo", x => { x.S.love.affection -= 10; return "Ela entendeu, mas ficou pensativa."; })); }),
+
+            (g => g.S.love.stage == 3 && g.S.love.weeks >= 10, 1.3, g => {
+                long big = Game.R1000(Math.Max(120000, g.S.player.money * .12)), small = Game.R1000(Math.Max(25000, g.S.player.money * .03));
+                return Ev("O casamento", $"Chegou a hora de casar com {g.S.love.name}. Como vai ser a festa?",
+                    Opt($"Festança ({Fmt.Money(big)})", x => { var p = x.S.player; p.money -= big; p.fame += 5; p.moral += 15; x.S.love.stage = 4; x.S.love.weeks = 0; x.S.love.affection = 95;
+                        return "Festa de três dias, revista de celebridades e o elenco inteiro na pista."; }),
+                    Opt($"Cerimônia íntima ({Fmt.Money(small)})", x => { var p = x.S.player; p.money -= small; p.moral += 12; x.S.love.stage = 4; x.S.love.weeks = 0; x.S.love.affection = 92;
+                        return "Só família e amigos de verdade. Inesquecível."; })); }),
+
+            (g => g.S.love.stage >= 2 && g.S.love.famous && g.S.player.fame >= 25, .5, g => Ev("Paparazzi", $"Fotógrafos seguiram você e {g.S.love.name} na praia. As fotos saem amanhã.",
+                Opt("Posar para as fotos", x => { x.S.player.fame += 2; x.S.love.affection += 3; return "Capa de revista. O casal mais comentado da semana."; }),
+                Opt("Pedir privacidade", x => { x.S.love.affection += 6; x.S.player.coach += 1; return "Vocês foram embora. Ela gostou da atitude."; }))),
+
+            (g => g.S.love.stage >= 2 && g.S.love.affection < 35, 1.1, g => Ev("Crise no relacionamento", $"{g.S.love.name} reclama que você só pensa em futebol.",
+                Opt("Viagem de fim de semana", x => { long c = Game.R1000(Math.Max(8000, x.S.contract.salary * .6)); x.S.player.money -= c; x.S.player.energy += 6; x.S.love.affection += 25;
+                    return $"Dois dias longe de tudo ({Fmt.Money(c)}). Vocês voltaram bem."; }),
+                Opt("Prometer mudar", x => { x.S.love.affection += 8; return "Ela vai esperar para ver."; }),
+                Opt("Dar um tempo", x => { x.S.love.affection = 5; return "Vocês decidiram dar um tempo."; }))),
+
+            // ---------- rival ----------
+            (g => !string.IsNullOrEmpty(g.S.rival.name) && g.RivalClub != null, .8, g => Ev("Provocação do rival", $"{g.S.rival.name}, do {g.RivalClub.name}, disse numa entrevista que você é \"jogador de rede social\".",
+                Opt("Responder à altura", x => { var p = x.S.player; x.S.rival.heat += 12;
+                    if (Rng.Chance(.55)) { p.fame += 3; p.moral += 3; return "Sua resposta viralizou. A torcida comprou a briga."; }
+                    p.coach -= 4; return "A resposta pegou mal e o clube pediu silêncio."; }),
+                Opt("Responder em campo", x => { x.S.player.coach += 2; x.S.player.moral += 2; return "\"Falo dentro de campo.\" A imprensa elogiou a postura."; }))),
+
+            (g => !string.IsNullOrEmpty(g.S.rival.name) && g.S.season.week >= 6, .6, g => {
+                var r = g.S.rival; int mine = g.S.season.stats.goals;
+                return Ev("Quem é melhor?", $"Um programa de TV comparou você e {r.name}: {mine} gol(s) seus contra {r.goals} dele na temporada.",
+                    Opt("\"Os números falam\"", x => { var p = x.S.player; x.S.rival.heat += 8;
+                        if (mine >= r.goals) { p.fame += 3; p.moral += 4; return "Os números estão do seu lado. A frase virou meme."; }
+                        p.fame -= 1; p.moral -= 3; return "Ele está na frente e as redes não perdoaram a frase."; }),
+                    Opt("Elogiar o rival", x => { x.S.player.fame += 1; x.S.rival.heat -= 10; return "Classe. O público gostou da humildade."; })); }),
+
+            (g => !string.IsNullOrEmpty(g.S.rival.name) && g.S.player.fame >= 15, .4, g => Ev("Encontro na premiação", $"Na festa de premiação você fica frente a frente com {g.S.rival.name}.",
+                Opt("Cumprimentar", x => { x.S.rival.heat -= 15; x.S.player.fame += 1; return "Aperto de mão e foto juntos. A rivalidade esfriou um pouco."; }),
+                Opt("Passar reto", x => { x.S.rival.heat += 10; x.S.player.fame += 1.5f; return "As câmeras pegaram o gelo. Virou assunto a semana inteira."; }))),
+
+            (g => !string.IsNullOrEmpty(g.S.rival.name) && g.S.love.stage == 0 && g.S.rival.heat >= 50, .3, g => Ev("Rival na balada", $"{g.S.rival.name} postou foto numa festa com a sua ex. A internet não fala de outra coisa.",
+                Opt("Rir da situação", x => { x.S.player.fame += 2; x.S.player.moral += 1; return "Seu meme em resposta foi o post mais curtido do mês."; }),
+                Opt("Ignorar", x => { x.S.player.moral -= 2; x.S.rival.heat += 5; return "Você não comentou, mas ficou incomodado."; }))),
 
             (g => g.S.player.money >= 50000, .4, g => Ev("Irmão empresário", "Seu irmão quer largar o emprego para cuidar da sua carreira como empresário.",
                 Opt("Dar a chance", x => { var p = x.S.player;

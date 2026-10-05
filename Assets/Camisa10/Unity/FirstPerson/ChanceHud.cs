@@ -291,7 +291,14 @@ namespace Camisa10.UI
 
         // ---------- controles na tela ----------
         public VirtualStick Stick;
-        public TouchButton Shoot, PassBtn, Dribble, Sprint, TackleL, TackleR, Skill, Finesse;
+        public TouchButton Shoot, PassBtn, Dribble, Sprint, TackleL, TackleR, Skill, Finesse, SkipBtn;
+
+        /// <summary>Mostra o botão de pular (comemoração) e chama onSkip quando tocado.</summary>
+        public void ShowSkip(bool on, System.Action onSkip = null)
+        {
+            SkipBtn.gameObject.SetActive(on);
+            SkipBtn.OnPress = on ? onSkip : null;
+        }
         Text skillHint;
         Image staminaFill, dribbleRing;
         GameObject stickGo;
@@ -382,6 +389,12 @@ namespace Camisa10.UI
             // defesa: desarmar para um lado ou para o outro
             TackleL = WideButton(safe, "‹ DESARME", bl, new Vector2(250, 200));
             TackleR = WideButton(safe, "DESARME ›", br, new Vector2(-250, 200));
+
+            // pular a comemoração
+            SkipBtn = WideButton(safe, "PULAR ›", br, new Vector2(-190, 110));
+            SkipBtn.GetComponent<Image>().color = new Color(0, 0, 0, .55f);
+            SkipBtn.GetComponent<RectTransform>().sizeDelta = new Vector2(260, 100);
+            SkipBtn.gameObject.SetActive(false);
             Controls(false, false, false, false, false, false);
         }
 
@@ -417,6 +430,13 @@ namespace Camisa10.UI
             rt.anchoredPosition = new Vector2(0, -(popups++ % 3) * 70);
             var o = t.gameObject.AddComponent<Outline>(); o.effectColor = new Color(0, 0, 0, .75f); o.effectDistance = new Vector2(3, -3);
             t.gameObject.AddComponent<FloatUp>();
+        }
+
+        /// <summary>Acende o botão CORRER enquanto o jogador está em arrancada.</summary>
+        public void SprintOn(bool on)
+        {
+            var g = Sprint.GetComponent<Image>();
+            if (g != null) Sprint.transform.localScale = Vector3.one * (on ? 1.12f : 1f);
         }
 
         public void SetStamina(float v01)

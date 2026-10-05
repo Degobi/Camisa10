@@ -400,6 +400,9 @@ namespace Camisa10.UI
             var floor = new GameObject("Chao");
             floor.transform.SetParent(Root, false);
             var bc = floor.AddComponent<BoxCollider>();
+            // gramado: devolve uns 60% da batida e segura a bola (grama freia)
+            bc.sharedMaterial = new PhysicsMaterial("Grama") { bounciness = .55f, dynamicFriction = .55f, staticFriction = .6f,
+                bounceCombine = PhysicsMaterialCombine.Average, frictionCombine = PhysicsMaterialCombine.Average };
             bc.center = new Vector3(0, -.5f, -50); bc.size = new Vector3(120, 1, 140);
 
             // linhas: tudo numa malha só
@@ -459,9 +462,11 @@ namespace Camisa10.UI
             // traves com colisor no gol do lance (a bola bate na trave de verdade)
             var postMat = Mat(new Color(.97f, .97f, .97f), .7f);
             float px = GoalHalfWidth + .06f;
+            var postPhys = new PhysicsMaterial("Trave") { bounciness = .6f, dynamicFriction = .2f, staticFriction = .2f, bounceCombine = PhysicsMaterialCombine.Average };
             Prim(PrimitiveType.Cylinder, Root, new Vector3(-px, 1.25f, z), new Vector3(.12f, 1.25f, .12f), postMat, colliders).name = "TraveE";
             Prim(PrimitiveType.Cylinder, Root, new Vector3(px, 1.25f, z), new Vector3(.12f, 1.25f, .12f), postMat, colliders).name = "TraveD";
             Prim(PrimitiveType.Cylinder, Root, new Vector3(0, GoalHeight + .06f, z), new Vector3(.12f, px, .12f), postMat, colliders, Quaternion.Euler(0, 0, 90)).name = "TraveTravessao";
+            if (colliders) foreach (Transform t in Root) if (t.name.StartsWith("Trave") && t.GetComponent<Collider>() != null) t.GetComponent<Collider>().sharedMaterial = postPhys;
 
             // rede de fios finos (estufa quando a bola entra) e suportes no formato caixote
             var net = GoalNet.Build(Root, z, back, Own(Unlit(Night ? new Color(.86f, .88f, .92f) : new Color(.93f, .94f, .96f))));
@@ -782,6 +787,10 @@ namespace Camisa10.UI
             Ball.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
             Ball.isKinematic = true;
             ball.AddComponent<BallSounds>();
+            // bola oficial: quica bem (coeficiente ~0,75 com o gramado no meio-termo) e roda com atrito
+            ball.GetComponent<Collider>().sharedMaterial = new PhysicsMaterial("Bola") { bounciness = .72f, dynamicFriction = .45f, staticFriction = .5f,
+                bounceCombine = PhysicsMaterialCombine.Average, frictionCombine = PhysicsMaterialCombine.Average };
+            Ball.maxAngularVelocity = 120f;
         }
 
         /// <summary>
@@ -825,10 +834,10 @@ namespace Camisa10.UI
         }
 
         /// <summary>Jogador com o uniforme completo do clube (ou de goleiro, se kit.Keeper).</summary>
-        public Transform Person(string name, Kit kit, Vector3 pos, float yaw)
+        public Transform Person(string name, Kit kit, Vector3 pos, float yaw, BootStyle bootStyle = null, int? number = null)
         {
-            var boots = Theme.Hex(Rng.Chance(.5) ? "#151515" : Rng.Chance(.5) ? "#F5F5F5" : "#E8542B");
-            var rig = PersonRig.Build(Root, name, kit.Main, kit.Shorts, kit.Socks, boots, kit.Keeper ? 1 : Rng.RangeInt(2, 30), kit.Keeper, kit);
+            var style = bootStyle ?? BootModel.Random();
+            var rig = PersonRig.Build(Root, name, kit.Main, kit.Shorts, kit.Socks, Theme.Hex(style.c1), number ?? (kit.Keeper ? 1 : Rng.RangeInt(2, 30)), kit.Keeper, kit, style);
             rig.transform.localPosition = pos;
             rig.transform.localRotation = Quaternion.Euler(0, yaw, 0);
             return rig.transform;
