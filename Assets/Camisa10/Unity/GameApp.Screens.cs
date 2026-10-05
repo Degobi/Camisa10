@@ -188,6 +188,8 @@ namespace Camisa10.UI
             var p = game.S.player;
             var f = game.CurrentFixture();
 
+            CalendarStrip();
+
             // linha 1: próximo jogo, semana, condição
             var row1 = UIKit.Cols(content);
 
@@ -278,6 +280,50 @@ namespace Camisa10.UI
             }
 
             HomeGlory();
+        }
+
+        /// <summary>Faixa do calendário: os próximos jogos (escudo, casa/fora, clássico e rival em destaque) e as datas especiais.</summary>
+        void CalendarStrip()
+        {
+            var items = game.Upcoming(9);
+            if (items.Count == 0) return;
+            var t = UIKit.Tile(content, "Calendário", Theme.Cyan, 1, 18, 8);
+            var row = UIKit.Row(t, 10, TextAnchor.UpperLeft);
+            row.GetComponent<HorizontalLayoutGroup>().childForceExpandHeight = true;
+            UIKit.LE(row, 150, 150);
+            for (int i = 0; i < items.Count; i++)
+            {
+                var it = items[i];
+                bool next = i == 0;
+                Color edge = it.kind != "liga" ? Theme.Gold : it.derby ? Theme.Red : it.rival ? Theme.Purple : next ? Theme.Turf : Theme.Line;
+                var cell = UIKit.Img(row, next ? Theme.Alpha(Theme.Turf, .14f) : Theme.Alpha(Theme.Chip, .85f), true, "Dia");
+                UIKit.LE(cell, flexW: 1, prefW: 0, minW: 0);
+                var o = cell.gameObject.AddComponent<Outline>();
+                o.effectColor = edge; o.effectDistance = new Vector2(2, -2);
+                UIKit.V(cell.gameObject, 8, 2, TextAnchor.UpperCenter);
+                if (it.kind == "liga")
+                {
+                    UIKit.Txt(cell.transform, next ? "PRÓXIMO" : "R" + it.round, 18, next ? Theme.Turf : Theme.Muted, FontStyle.Bold, TextAnchor.UpperCenter);
+                    UIKit.Crest(cell.transform, it.opp, 46, 54).GetComponent<LayoutElement>().flexibleWidth = 0;
+                    string sub = it.derby ? "CLÁSSICO" : it.rival ? "RIVAL" : it.home ? "CASA" : "FORA";
+                    UIKit.Txt(cell.transform, sub, 18, it.derby ? Theme.Red : it.rival ? Theme.Purple : Theme.Ink, FontStyle.Bold, TextAnchor.UpperCenter);
+                    var nm = UIKit.Txt(cell.transform, it.opp.name, 16, Theme.Muted, FontStyle.Normal, TextAnchor.UpperCenter);
+                    nm.verticalOverflow = VerticalWrapMode.Truncate;
+                    UIKit.LE(nm, 20, 20);
+                }
+                else
+                {
+                    string big = it.kind == "copa" ? "COPA" : it.kind == "selecao" ? "BRA" : it.kind == "janela" ? "MERCADO" : "MUNDIAL";
+                    UIKit.Txt(cell.transform, "após R" + it.round, 18, Theme.Muted, FontStyle.Bold, TextAnchor.UpperCenter);
+                    UIKit.Space(cell.transform, 6);
+                    var bt = UIKit.Txt(cell.transform, big, 30, Theme.Gold, FontStyle.Bold, TextAnchor.MiddleCenter);
+                    bt.resizeTextForBestFit = true; bt.resizeTextMinSize = 16; bt.resizeTextMaxSize = 30;
+                    UIKit.LE(bt, 40, 40);
+                    var lb = UIKit.Txt(cell.transform, it.kind == "copa" ? it.label : it.kind == "selecao" ? "Data de seleções" : it.kind == "janela" ? "Janela de transferências" : it.label, 16, Theme.Ink, FontStyle.Normal, TextAnchor.UpperCenter);
+                    lb.resizeTextForBestFit = true; lb.resizeTextMinSize = 12; lb.resizeTextMaxSize = 16;
+                    UIKit.LE(lb, 38, 38);
+                }
+            }
         }
 
         /// <summary>Objetivos da temporada com barra de progresso (resultado final depois do último jogo).</summary>
