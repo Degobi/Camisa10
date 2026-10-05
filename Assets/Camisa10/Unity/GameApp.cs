@@ -45,7 +45,7 @@ namespace Camisa10.UI
         string negMsg = "";
 
         /// <summary>Versão mostrada no topo: confirma que a Unity está rodando o código novo.</summary>
-        public const string Version = "0.14";
+        public const string Version = "0.15";
 
         // abas do menu principal (ordem da barra)
         static readonly (string id, string label)[] Tabs =

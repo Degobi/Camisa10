@@ -16,7 +16,24 @@ Não é gerenciador estilo Brasfoot: você controla um jogador, não um time.
 - **Vida fora de campo** em `Core/Life.cs`: extrato semanal (imposto de renda por país em `LeagueDef.Tax`, 8% do empresário,
   custo de vida, manutenção dos bens, vida a dois), dívida, namorada (ficando → namorando → noivos → casados, com afeto
   que esfria) e rival fictício da mesma posição (gols, duelos diretos, provocações). Eventos ligados a eles em `GameEvents.cs`.
-  Calibre o dinheiro com o simulador (ele imprime o dinheiro e o saldo de cada temporada).
+  Calibre o dinheiro com o simulador (ele imprime o dinheiro, a fama e o saldo de cada temporada).
+  Fama: ganhos amortecidos em `Game.Normalize` (`FameGainFactor`); some `p.fame +=` normalmente e chame `Normalize`.
+- **Caixa de mensagens** (`Core/Inbox.cs`, aba Mensagens com selo de não lidas): o canal da história. Mande com
+  `Game.Mail(papel, de, assunto, texto, kind, data, opções...)`; respostas com efeito ficam em `Inbox.Replies` pelo `kind`
+  (o save guarda só o tipo). Chegam na virada da rodada (`InboxWeek`), no começo da temporada e nos acontecimentos.
+- **Objetivos da temporada** (`Core/Objectives.cs`): técnico (gols/participações/nota/jogos) e diretoria (tabela ou copa),
+  barras na Central; no fim valem bônus, relação com o técnico e renovação (`Season.objMet`).
+- **Reputação** (`Core/Reputation.cs`): técnico (`coach`), elenco (`squad`) e torcida (`fans`); use `AddSquad`/`AddFans`
+  (retorno decrescente). Elenco pesa na escalação; capitania oferecida pela caixa de mensagens; clássicos em `Game.Derbies`.
+  Torcida alta canta o nome no lance (`FansChant`), baixa vaia.
+- **Especialidades** (`Core/Traits.cs`): liberadas por atributo/conquista, efeito real no 3D (`Chance3D.Has("finalizador")`)
+  e em `MatchEngine.Prob` (`TraitBonus`). Selos na carta do jogador.
+- **Pós-jogo** (`GameApp.PostMatch`): placar, nota com a origem dos pontos, lances, craque do jogo (`MatchEngine.Motm`),
+  repercussão e a coletiva opcional (`Core/Press.cs`). **Gala** de fim de temporada (`GameApp.Gala`).
+- **Calendário** (`Core/Calendar.cs`, faixa no topo da Central) e **mercado** (`Core/Market.cs`): rumores, janela depois da
+  rodada `WindowRound` (metade) com propostas pela caixa, multa paga, empréstimo de jovem sem minutos (`S.loanFrom`, volta
+  no fim do ano), pedido para sair. Troca de liga no meio do ano remonta tabela e artilharia (`SwitchLeague`).
+- Vida (aba Vida): estilo de vida, programas com o elenco (`LifeData.Social`, gastam horário da agenda) e loja por categoria.
 - Plataforma: Android primeiro, iOS depois (o dono tem Mac). Idioma da interface: português do Brasil.
 
 ## Stack e regras do projeto
@@ -32,7 +49,8 @@ Não é gerenciador estilo Brasfoot: você controla um jogador, não um time.
   `Goalkeeper` (reação + mergulho físico; calibrado por simulação: goleiro médio defende ~50% de canto baixo com força a 18 m,
   ~40% de ângulo, quase tudo no meio; pênalti com canto certo ~50%: mexa nos números testando a taxa, não no olho),
   `SwipePad` e `TouchControls` (entrada), `ChanceHud` (HUD do lance, placar estilo TV e vinheta),
-  `Chance3D.Celebration` (comemoração em terceira pessoa depois do gol, com gestos do `PersonRig.Gesture`, pulável).
+  `Chance3D.Celebration` (comemoração em terceira pessoa depois do gol, com gestos do `PersonRig.Gesture`, pulável),
+  `Chance3D.Replay` (replay do gol em câmera lenta numa câmera de TV, pulável; sempre devolva `Time.timeScale = 1`).
   Chuteira: `Art/BootModel.cs` (malha própria com cano aberto, forro, lingueta, cadarço, solado e travas; textura nas cores
   do `BootStyle`; a mesma malha vira a foto do menu). Mudou forma do corpo ou da chuteira? Suba `ProceduralBody.ModelVersion`
   e gere `Resources/Modelos/corpo.bytes` de novo (menu Camisa 10 > Gerar corpo dos jogadores).
@@ -93,7 +111,9 @@ Não é gerenciador estilo Brasfoot: você controla um jogador, não um time.
    Sem o editor aberto, fotografe o lance (dia e noite), os menus e exporte os sons em `Capturas/`:
    `Unity -batchmode -projectPath . -executeMethod Camisa10.EditorTools.Camisa10Preview.CaptureBatch -logFile -`
    (no editor: menu **Camisa 10 > Capturar imagens do lance**).
-   Lances jogados de verdade (todos os tipos, em Play): `-executeMethod Camisa10.EditorTools.Camisa10SmokeTest.Run`
+   As capturas de menu jogam rodadas de uma carreira de exemplo (`Camisa10Preview.PlayRounds`) e fotografam também caixa de
+   mensagens, pós-jogo, coletiva, janela de transferências, fim de temporada e gala (`menu-*.png`).
+   Lances jogados de verdade (todos os tipos, em Play, inclusive o replay): `-executeMethod Camisa10.EditorTools.Camisa10SmokeTest.Run`
    (menu **Camisa 10 > Testar lances automaticamente**). Com o editor aberto, rode numa cópia do projeto.
 3. Builds: menu **Camisa 10 > Gerar APK de teste** (gera `Builds/Camisa10.apk`). `Camisa10BuildPrep` roda antes de todo build:
    sem ele o celular corta colisores e o shader (tela rosa), porque a cena é vazia e tudo nasce por código.
