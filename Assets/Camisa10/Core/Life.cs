@@ -42,6 +42,26 @@ namespace Camisa10.Core
             }
         }
 
+        /// <summary>Programa com os amigos do elenco (aba Vida): gasta um horário da agenda e aproxima o vestiário.</summary>
+        public class SocialDef
+        {
+            public string Id, Name, Hint, Icon;
+            public double Cost;      // em reais, ajustado pelo custo de vida do país
+            public float Squad, Moral, Energy, Fame;
+            public Func<Game, bool> Available;
+        }
+
+        public static readonly SocialDef[] Social =
+        {
+            new SocialDef { Id = "games", Icon = "GAME", Name = "Noite de games online", Hint = "Campeonato de videogame com a turma do time.", Cost = 0, Squad = 3, Moral = 2, Energy = -1 },
+            new SocialDef { Id = "pagode", Icon = "SOM", Name = "Pagode na casa de um companheiro", Hint = "Você leva as bebidas. Resenha garantida.", Cost = 600, Squad = 6, Moral = 4, Energy = -6 },
+            new SocialDef { Id = "futevolei", Icon = "BOLA", Name = "Futevôlei com o elenco", Hint = "Na praia ou na quadra, com foto para as redes.", Cost = 300, Squad = 4, Moral = 3, Energy = -5, Fame = .4f },
+            new SocialDef { Id = "aniversario", Icon = "FEST", Name = "Aniversário de um companheiro", Hint = "Leve um presente à altura.", Cost = 1500, Squad = 6, Moral = 3, Energy = -4 },
+            new SocialDef { Id = "churrasco", Icon = "CASA", Name = "Churrasco na sua casa", Hint = "Precisa de casa própria. O elenco inteiro aparece.", Cost = 2500, Squad = 9, Moral = 5, Energy = -3, Fame = .3f,
+                Available = g => g.S.owned.Exists(id => id.StartsWith("casa")) },
+            new SocialDef { Id = "viagem", Icon = "VIAG", Name = "Viagem de folga com a turma", Hint = "Dois dias fora com os amigos do time. Descansa e une o grupo.", Cost = 12000, Squad = 10, Moral = 8, Energy = 6 },
+        };
+
         /// <summary>Manutenção semanal de um bem: seguro, IPVA, condomínio, IPTU, funcionários (fração do preço).</summary>
         public static double UpkeepRate(string cat) => cat == "Carro" ? .003 : cat == "Casa" ? .0012 : .0004;
     }
@@ -131,6 +151,52 @@ namespace Camisa10.Core
             Normalize();
             AddNews($"Você vendeu: {it.Name.ToLowerInvariant()}, por {Fmt.Money(v)}.");
             return $"Vendido por {Fmt.Money(v)}.";
+        }
+
+        // ---------- programas com o elenco ----------
+        public long SocialCost(LifeData.SocialDef d) => R100(d.Cost * CostMult);
+
+        public bool CanSocial(string id, out string why)
+        {
+            var d = Array.Find(LifeData.Social, x => x.Id == id);
+            why = null;
+            if (d == null) { why = "Indisponível."; return false; }
+            if (S.season.phase == "end") { why = "Férias."; return false; }
+            if (ActionsLeft <= 0) { why = "Agenda cheia."; return false; }
+            if (S.season.doneActions.Contains("s:" + id)) { why = "Já feito."; return false; }
+            if (d.Available != null && !d.Available(this)) { why = "Precisa de casa."; return false; }
+            if (d.Energy < 0 && S.player.energy + d.Energy < 5) { why = "Sem energia."; return false; }
+            if (SocialCost(d) > S.player.money) { why = "Sem dinheiro."; return false; }
+            return true;
+        }
+
+        /// <summary>Faz o programa com os amigos: gasta um horário da agenda, dinheiro e energia; aproxima o vestiário.</summary>
+        public string DoSocial(string id)
+        {
+            if (!CanSocial(id, out string why)) return why;
+            var d = Array.Find(LifeData.Social, x => x.Id == id);
+            var p = S.player;
+            S.season.actionsUsed++;
+            S.season.doneActions.Add("s:" + id);
+            long cost = SocialCost(d);
+            p.money -= cost; p.energy += d.Energy; p.moral += d.Moral; p.fame += d.Fame;
+            AddSquad(d.Squad);
+            string mate = Teammate();
+            string msg;
+            switch (id)
+            {
+                case "games": msg = $"Você e {mate} viraram a madrugada no online. Ele pediu revanche."; break;
+                case "pagode": msg = $"Pagode na casa de {mate} até tarde. O grupo está fechado com você."; break;
+                case "futevolei": msg = $"Futevôlei com {mate} e a turma. O vídeo bombou nas redes."; break;
+                case "aniversario": msg = $"Aniversário de {mate}: o seu presente ({Fmt.Money(cost)}) foi o assunto da festa."; break;
+                case "churrasco": msg = "Churrasco na sua casa com o elenco inteiro. Até o técnico apareceu para uma foto."; break;
+                default: msg = $"Viagem com {mate} e a turma ({Fmt.Money(cost)}). Voltaram mais unidos e descansados."; break;
+            }
+            // noite longa às vezes vira fofoca
+            if ((id == "pagode" || id == "viagem") && Rng.Chance(.15)) { p.coach -= 3; msg += " Teve foto vazada e o técnico torceu o nariz."; }
+            Normalize();
+            if (S.season.phase == "match") S.season.role = ComputeRole();
+            return msg;
         }
 
         // ---------- namorada ----------

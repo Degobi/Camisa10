@@ -37,7 +37,7 @@ static class Program
             string pos = Positions[k % Positions.Length];
             var g = Game.NewCareer("Simulado " + (k + 1), pos, new[] { 4, 4, 3, 3, 3, 3 });
             int seasons = 0;
-            var moneyBySeason = new List<long>(); var netBySeason = new List<long>(); var objBySeason = new List<string>();
+            var fameBySeason = new List<int>(); var moneyBySeason = new List<long>(); var netBySeason = new List<long>(); var objBySeason = new List<string>();
             try
             {
                 while (!g.S.retired && seasons < 22)
@@ -53,6 +53,9 @@ static class Program
                             var acts = BusinessData.Actions.Select(a => a.Id).Where(id => g.CanDoAction(id, out _)).ToList();
                             Rng.Shuffle(acts);
                             foreach (var id in acts.Take(3)) if (g.CanDoAction(id, out _)) { g.DoAction(id); actions++; }
+                            // programa com o elenco de vez em quando
+                            var soc = LifeData.Social[Rng.RangeInt(0, LifeData.Social.Length - 1)];
+                            if (Rng.Chance(.4) && g.CanSocial(soc.Id, out _)) g.DoSocial(soc.Id);
                             // compra o bem mais barato que ainda não tem quando sobra bastante dinheiro
                             var item = GameData.Items.Where(x => !g.S.owned.Contains(x.Id)).OrderBy(x => x.Price).FirstOrDefault();
                             if (item != null && g.S.player.money > item.Price * 3) g.Buy(item.Id);
@@ -90,7 +93,7 @@ static class Program
                     if (g.S.wc != null && g.S.wc.champion && g.S.wc.year == g.S.year) wcWon++;
                     seasons++;
                     objBySeason.Add($"{g.S.season.objMet}/{g.S.season.objectives.Count}");
-                    moneyBySeason.Add(g.S.player.money);
+                    moneyBySeason.Add(g.S.player.money); fameBySeason.Add((int)g.S.player.fame);
                     netBySeason.Add(g.S.seasonNet);
                     var lg = g.MyClub.league;
                     leaguesSeen[lg] = leaguesSeen.TryGetValue(lg, out var c) ? c + 1 : 1;
@@ -116,6 +119,7 @@ static class Program
             Console.WriteLine($"Carreira {k + 1} ({pos}): {seasons} temporadas, {g.CareerApps} jogos, {g.CareerGoals} gols, geral {g.Ovr}, idade {s.player.age}, " +
                 $"Seleção {s.caps} jogos/{s.intlGoals} gols, Copas {s.worldCups}, títulos {s.titles.Count}: {string.Join("; ", s.titles.Take(6))}");
             Console.WriteLine($"   Clubes: {string.Join(" → ", s.career.Select(r => r.club).Distinct())}");
+            Console.WriteLine($"   Fama no fim de cada temporada: {string.Join(" ", fameBySeason)}");
             Console.WriteLine($"   Dinheiro no fim de cada temporada: {string.Join(" | ", moneyBySeason.Select(x => Fmt.Money(x)))}");
             Console.WriteLine($"   Objetivos cumpridos: {string.Join(" ", objBySeason)}");
             Console.WriteLine($"   Saldo de cada temporada: {string.Join(" | ", netBySeason.Select(x => Fmt.Money(x)))}");

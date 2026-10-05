@@ -70,7 +70,7 @@ namespace Camisa10.Core
                 Opt("Pedir para ser poupado", x => { x.S.season.rested = true; x.S.player.energy += 15; x.S.player.coach -= 2; return "Você fica fora desta rodada para se recuperar."; }))),
 
             (g => g.S.player.fame >= 35, .8, g => {
-                long v = Game.R1000(8000 * Math.Exp(g.S.player.fame / 20.0));
+                long v = Game.R1000(6000 * Math.Exp(g.S.player.fame / 26.0));
                 return Ev("Convite da TV", $"Um programa de domingo quer uma entrevista exclusiva. Cachê de {Fmt.Money(v)}.",
                     Opt("Aceitar", x => { var p = x.S.player; p.money += v; p.fame += 3; p.energy -= 8; return "A entrevista foi sucesso de audiência."; }),
                     Opt("Recusar", x => "Você preferiu se preservar.")); }),

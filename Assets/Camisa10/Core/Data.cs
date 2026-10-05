@@ -298,6 +298,12 @@ namespace Camisa10.Core
 
         public static readonly Item[] Items =
         {
+            new Item { Id = "roupa1", Cat = "Roupa", Name = "Tênis de grife", Price = 4500, Fame = 0, Moral = 2 },
+            new Item { Id = "estilo2", Cat = "Estilo", Name = "Óculos de sol de grife", Price = 6000, Fame = 1, Moral = 1 },
+            new Item { Id = "roupa2", Cat = "Roupa", Name = "Jaqueta de couro italiana", Price = 9000, Fame = 1, Moral = 2 },
+            new Item { Id = "roupa3", Cat = "Roupa", Name = "Terno sob medida", Price = 18000, Fame = 1, Moral = 3 },
+            new Item { Id = "roupa4", Cat = "Roupa", Name = "Coleção de streetwear exclusiva", Price = 35000, Fame = 2, Moral = 3 },
+            new Item { Id = "estilo3", Cat = "Estilo", Name = "Corrente de ouro", Price = 60000, Fame = 2, Moral = 3 },
             new Item { Id = "carro1", Cat = "Carro", Name = "Carro popular zero", Price = 80000, Fame = 1, Moral = 4 },
             new Item { Id = "casa1", Cat = "Casa", Name = "Apartamento para a família", Price = 450000, Fame = 1, Moral = 8 },
             new Item { Id = "carro2", Cat = "Carro", Name = "Esportivo importado", Price = 900000, Fame = 4, Moral = 6 },

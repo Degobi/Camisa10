@@ -116,9 +116,9 @@ namespace Camisa10.EditorTools
             var scaler = go.GetComponentInChildren<UnityEngine.UI.CanvasScaler>();
 
             var scroll = (UnityEngine.UI.ScrollRect)t.GetField("scroll", flags).GetValue(app);
-            foreach (var shot in new[] { "home", "home-baixo", "inbox", "player", "life", "life-baixo", "agenda", "settings", "trophies", "posjogo", "coletiva", "contrato-janela", "fim" })
+            foreach (var shot in new[] { "home", "home-baixo", "inbox", "player", "life", "life-meio", "life-baixo", "agenda", "settings", "trophies", "posjogo", "coletiva", "contrato-janela", "fim" })
             {
-                string tab = shot.Replace("-baixo", "");
+                string tab = shot.Replace("-baixo", "").Replace("-meio", "");
                 if (shot == "posjogo" || shot == "coletiva" || shot == "fim") tab = "home";
                 if (shot == "contrato-janela")
                 {
@@ -147,11 +147,11 @@ namespace Camisa10.EditorTools
                     var m = (MatchEngine)t.GetField("postMatch", flags).GetValue(app);
                     t.GetMethod("PressStep", flags).Invoke(app, new object[] { PressConference.Build(game, m), 0 });
                 }
-                if (shot.EndsWith("-baixo"))
+                if (shot.EndsWith("-baixo") || shot.EndsWith("-meio"))
                 {
                     Canvas.ForceUpdateCanvases();
                     UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)canvas.transform);
-                    scroll.verticalNormalizedPosition = 0;
+                    scroll.verticalNormalizedPosition = shot.EndsWith("-meio") ? .45f : 0;
                 }
                 for (int i = 0; i < 3; i++)
                 {

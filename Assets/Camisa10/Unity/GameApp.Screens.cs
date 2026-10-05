@@ -959,114 +959,186 @@ namespace Camisa10.UI
         }
 
         // ---------- vida ----------
+        string lifeCat = "Carro"; // vitrine da loja na aba Vida
+
         void BuildLife()
         {
             var p = game.S.player;
+
+            // linha 1: como você vive hoje, vida pessoal e o extrato
             var cols = UIKit.Cols(content);
+            var home = UIKit.Tile(cols, "Seu estilo de vida", Theme.Purple, 1.15f, 26, 12);
+            LifeSlot(home, "Casa", BestOwned("Casa"), "Você mora num apartamento alugado perto do CT.");
+            LifeSlot(home, "Carro", BestOwned("Carro"), "Você vai ao treino de aplicativo.");
+            var style = GameData.Items.Where(x => (x.Cat == "Estilo" || x.Cat == "Roupa") && game.S.owned.Contains(x.Id)).ToList();
+            LifeSlot(home, "Estilo", style.Count == 0 ? null : style.OrderByDescending(x => x.Price).First(),
+                "Roupa de treino e chinelo. A imprensa de moda ainda não te conhece.", style.Count > 1 ? $" e mais {style.Count - 1}" : "");
+            UIKit.KV(home, "Manutenção de tudo por rodada", Fmt.Money(game.UpkeepWeekly));
 
-            var left = UIKit.Stack(cols, .9f);
-            var m = UIKit.Tile(left, "Dinheiro em conta", Theme.Gold);
-            UIKit.Txt(m, Fmt.Money(p.money), 64, p.money < 0 ? Theme.Red : Theme.Gold, FontStyle.Bold);
-            // extrato da última rodada: o que entrou e o que saiu
-            var w = game.S.lastWeek;
-            UIKit.Label(m, "Extrato da última rodada", Theme.Muted, 20);
-            UIKit.KV(m, "Salário", "+" + Fmt.Money(w.salary));
-            if (w.bonus > 0) UIKit.KV(m, "Bônus por gols", "+" + Fmt.Money(w.bonus));
-            if (w.sponsors > 0) UIKit.KV(m, "Patrocínios", "+" + Fmt.Money(w.sponsors));
-            if (w.business != 0) UIKit.KV(m, "Negócios", (w.business > 0 ? "+" : "") + Fmt.Money(w.business));
-            UIKit.KV(m, $"Imposto de renda ({w.taxRate * 100:0.#}%)", "-" + Fmt.Money(w.tax));
-            UIKit.KV(m, $"Empresário ({Game.AgentFee * 100:0}%)", "-" + Fmt.Money(w.agent));
-            UIKit.KV(m, "Custo de vida", "-" + Fmt.Money(w.living));
-            if (w.upkeep > 0) UIKit.KV(m, "Manutenção dos bens", "-" + Fmt.Money(w.upkeep));
-            if (w.partner > 0) UIKit.KV(m, "Vida a dois", "-" + Fmt.Money(w.partner));
-            UIKit.KV(m, "Saldo da rodada", (w.Net >= 0 ? "+" : "") + Fmt.Money(w.Net));
-            UIKit.KV(m, "Saldo na temporada", (game.S.seasonNet >= 0 ? "+" : "") + Fmt.Money(game.S.seasonNet));
-            UIKit.Ghost(m, "Investir em negócios", () => { tab = "business"; Render(true); });
-
-            // vida pessoal: relacionamento e rival
-            var lv = UIKit.Tile(left, "Vida pessoal", Theme.Red);
+            var lv = UIKit.Tile(cols, "Vida pessoal", Theme.Red, 1f, 26, 10);
             var love = game.S.love;
             HeadRow(lv, game.LoveLine(), love.stage == 0 ? "SOLTEIRO" : LifeData.StageName(love.stage).ToUpperInvariant(),
                 love.stage == 0 ? Theme.Chip : Theme.Red, love.stage == 0 ? Theme.Ink : Color.white);
             if (love.stage > 0)
             {
-                UIKit.KV(lv, "Clima entre vocês", love.affection >= 70 ? "Apaixonados" : love.affection >= 45 ? "Tranquilo" : love.affection >= 25 ? "Esfriando" : "Em crise");
-                UIKit.Muted(lv, "Sem atenção a relação esfria. Jantares e escolhas nos eventos aquecem.", 20);
+                UIKit.Muted(lv, love.affection >= 70 ? "Apaixonados" : love.affection >= 45 ? "Clima tranquilo" : love.affection >= 25 ? "Esfriando: precisa de atenção" : "Em crise", 22);
+                UIKit.Bar(lv, love.affection / 100f, love.affection >= 45 ? Theme.Red : Theme.Gold, 10);
+                UIKit.Muted(lv, "Sem atenção a relação esfria. Jantares, mensagens e escolhas nos eventos aquecem.", 20);
             }
             else UIKit.Muted(lv, "Saia para conhecer gente na Agenda ou responda as mensagens que chegarem.", 20);
             var rv = game.S.rival;
             if (!string.IsNullOrEmpty(rv.name) && game.RivalClub != null)
             {
-                UIKit.Space(lv, 8);
-                UIKit.Label(lv, "Rival", Theme.Gold, 22);
-                UIKit.KV(lv, rv.name, game.RivalClub.name);
+                UIKit.Space(lv, 6);
+                var rr = UIKit.Row(lv, 12);
+                UIKit.Crest(rr, game.RivalClub, 40, 48);
+                var rc = UIKit.Column(rr, 0);
+                UIKit.LE(rc, flexW: 1, minW: 0);
+                UIKit.Label(rc, "Rival · " + (rv.heat >= 60 ? "guerra declarada" : rv.heat >= 30 ? "provocações" : "respeito"), Theme.Gold, 20);
+                UIKit.Txt(rc, $"{rv.name} ({game.RivalClub.name})", 24, Theme.Ink, FontStyle.Bold);
                 UIKit.KV(lv, "Gols na temporada", $"você {game.S.season.stats.goals} x {rv.goals} ele");
                 if (rv.duels > 0) UIKit.KV(lv, "Duelos diretos", $"{rv.won} vitória(s) em {rv.duels}");
-                UIKit.KV(lv, "Clima", rv.heat >= 60 ? "Guerra declarada" : rv.heat >= 30 ? "Provocações" : "Respeito");
             }
 
-            var n = UIKit.Tile(left, "Notícias", Theme.Cyan);
+            var m = UIKit.Tile(cols, "Dinheiro em conta", Theme.Gold, 1f, 26, 4);
+            UIKit.Txt(m, Fmt.Money(p.money), 56, p.money < 0 ? Theme.Red : Theme.Gold, FontStyle.Bold);
+            // extrato da última rodada: o que entrou e o que saiu
+            var w = game.S.lastWeek;
+            UIKit.Label(m, "Extrato da última rodada", Theme.Muted, 20);
+            Money(m, "Salário", w.salary);
+            if (w.bonus > 0) Money(m, "Bônus por gols", w.bonus);
+            if (w.sponsors > 0) Money(m, "Patrocínios", w.sponsors);
+            if (w.business != 0) Money(m, "Negócios", w.business);
+            Money(m, $"Imposto de renda ({w.taxRate * 100:0.#}%)", -w.tax);
+            Money(m, $"Empresário ({Game.AgentFee * 100:0}%)", -w.agent);
+            Money(m, "Custo de vida", -w.living);
+            if (w.upkeep > 0) Money(m, "Manutenção dos bens", -w.upkeep);
+            if (w.partner > 0) Money(m, "Vida a dois", -w.partner);
+            Money(m, "Saldo da rodada", w.Net, true);
+            Money(m, "Saldo na temporada", game.S.seasonNet, true);
+
+            // linha 2: programas com os amigos do elenco
+            var so = UIKit.Tile(content, "Programas com a galera do time", Theme.Turf, 1, 24, 12);
+            HeadRow(so, $"Elenco: {Game.SquadLabel(p.squad).ToLowerInvariant()} ({Mathf.RoundToInt(p.squad)})",
+                game.S.season.phase == "end" ? "Férias" : $"{game.ActionsLeft} horário(s) livre(s)", Theme.Turf, Theme.TurfInk);
+            UIKit.Muted(so, "Cada programa gasta um horário da agenda da semana. Vestiário unido pesa na escalação e na braçadeira de capitão.", 22);
+            var srow = UIKit.Cols(so, 14);
+            foreach (var d in LifeData.Social) SocialCard(srow, d);
+
+            // linha 3: loja (casas, carros, estilo e roupas)
+            var shop = UIKit.Tile(content, "Loja", Theme.Purple, 1, 24, 14);
+            var tabs = UIKit.Row(shop, 12);
+            foreach (var (cat, label) in new[] { ("Carro", "Garagem"), ("Casa", "Imóveis"), ("Roupa", "Roupas"), ("Estilo", "Acessórios") })
+            {
+                string c = cat;
+                UIKit.LE(Chip(tabs, label, lifeCat == cat, () => { lifeCat = c; Render(); }, 64), flexW: 1, prefW: 0);
+            }
+            UIKit.Muted(shop, "Cada compra aumenta a moral e a fama, mas tem manutenção toda rodada (seguro, IPVA, condomínio). O que é seu pode ser vendido por 70% do preço.", 22);
+            var items = GameData.Items.Where(x => x.Cat == lifeCat).ToList();
+            var line = UIKit.Cols(shop, 16);
+            foreach (var it in items) ShopCard(line, it);
+            for (int k = items.Count; k < 4; k++) UIKit.LE(UIKit.Rect("Vazio", line), flexW: 1, prefW: 0, minW: 0);
+
+            var n = UIKit.Tile(content, "Notícias", Theme.Cyan);
             if (game.S.news.Count == 0) UIKit.Muted(n, "Nada por aqui ainda.");
-            foreach (var item in game.S.news.Take(12))
+            foreach (var item in game.S.news.Take(8))
             {
                 var col = UIKit.Column(n, 2);
                 UIKit.Label(col, item.when, Theme.Muted, 20);
                 UIKit.Txt(col, item.text, 24, Theme.Ink);
             }
+            UIKit.Ghost(content, "Ajustes e recomeçar carreira", () => { tab = "settings"; Render(true); });
+        }
 
-            var right = UIKit.Stack(cols, 1.2f);
-            var l = UIKit.Tile(right, "Estilo de vida", Theme.Purple);
-            UIKit.Muted(l, "Garagem, casa e acessórios. Cada compra aumenta sua moral e sua fama, mas tem manutenção toda rodada (seguro, IPVA, condomínio).");
-            // vitrine em cards de 3 colunas, com ilustração
-            RectTransform line = null;
-            int count = 0;
-            foreach (var it in GameData.Items)
+        GameData.Item BestOwned(string cat) => GameData.Items.Where(x => x.Cat == cat && game.S.owned.Contains(x.Id)).OrderByDescending(x => x.Price).FirstOrDefault();
+
+        /// <summary>Uma linha "Casa / Carro / Estilo" com o melhor item que você tem (ou como vive sem ele).</summary>
+        void LifeSlot(Transform parent, string cat, GameData.Item it, string none, string more = "")
+        {
+            var sc = SubCard(parent, 16, 4);
+            var r = UIKit.Row(sc, 14);
+            var chip = UIKit.Img(r, it != null ? LifeColor(cat) : Theme.Card, true, "Cat");
+            UIKit.LE(chip, 64, 64, prefW: 120, minW: 120);
+            var ct = UIKit.Txt(chip.transform, cat.ToUpperInvariant(), 22, it != null ? Color.white : Theme.Muted, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter);
+            UIKit.Stretch(ct.rectTransform);
+            var col = UIKit.Column(r, 2);
+            UIKit.LE(col, flexW: 1, minW: 0);
+            if (it != null)
             {
-                if (count++ % 3 == 0) line = UIKit.Cols(l, 16);
-                bool own = game.S.owned.Contains(it.Id);
-                var card = SubCard(line, 0, 0);
-                UIKit.LE(card, flexW: 1, prefW: 0, minW: 0);
-                // foto real se existir em Resources/Vida; senão, faixa com a categoria
-                var photo = Procedural.LifestyleSprite(it.Id);
-                var pic = UIKit.Img(card, photo != null ? Color.white : LifeColor(it.Cat), photo == null, "Foto");
-                if (photo != null) { pic.sprite = photo; pic.preserveAspect = true; }
-                else
-                {
-                    var cat = UIKit.Txt(pic.transform, it.Cat.ToUpperInvariant(), 44, Theme.Alpha(Color.white, .9f), FontStyle.BoldAndItalic, TextAnchor.MiddleCenter);
-                    UIKit.Stretch(cat.rectTransform);
-                }
-                UIKit.LE(pic, photo != null ? 170 : 92, photo != null ? 170 : 92);
-                if (own)
-                {
-                    var tag = UIKit.Tag(pic.transform, "Seu", Theme.Turf, Theme.TurfInk);
-                    tag.anchorMin = tag.anchorMax = tag.pivot = new Vector2(0, 1);
-                    tag.anchoredPosition = new Vector2(12, -12);
-                    tag.gameObject.AddComponent<ContentSizeFitter>().horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-                    tag.GetComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-                }
-                var info = UIKit.Column(card, 4);
-                info.GetComponent<VerticalLayoutGroup>().padding = new RectOffset(16, 16, 10, 16);
-                var name = UIKit.Txt(info, it.Name, 26, Theme.Ink, FontStyle.Bold);
-                name.resizeTextForBestFit = true; name.resizeTextMinSize = 18; name.resizeTextMaxSize = 26;
-                UIKit.LE(name, 32, 32);
-                UIKit.Txt(info, Fmt.Money(it.Price), 26, Theme.Gold, FontStyle.Bold);
-                UIKit.Muted(info, $"{it.Cat} · fama +{it.Fame} · moral +{it.Moral}", 20);
-                UIKit.Muted(info, $"Manutenção {Fmt.Money(Game.ItemUpkeep(it))} por rodada", 20);
-                string id = it.Id;
-                // o que é seu pode ser vendido (70% do preço) para cortar a manutenção
-                var b = own ? UIKit.Btn(info, $"Vender por {Fmt.Money(Game.R1000(it.Price * .7))}", Theme.Card, Theme.Gold, () => Commit(game.SellItem(id)), 56, 22)
-                    : UIKit.Primary(info, "Comprar", () => Commit(game.Buy(id)));
-                UIKit.LE(b, 56, 56);
-                b.interactable = own || p.money >= it.Price;
+                UIKit.Txt(col, it.Name + more, 26, Theme.Ink, FontStyle.Bold);
+                UIKit.Muted(col, $"Comprado por {Fmt.Money(it.Price)} · manutenção {Fmt.Money(Game.ItemUpkeep(it))}", 20);
             }
-            // completa a última linha para os cards não esticarem
-            for (; count % 3 != 0; count++) UIKit.LE(UIKit.Rect("Vazio", line), flexW: 1, prefW: 0, minW: 0);
+            else UIKit.Muted(col, none, 22);
+        }
 
-            UIKit.Ghost(right, "Ajustes e recomeçar carreira", () => { tab = "settings"; Render(true); });
+        void Money(Transform parent, string label, long v, bool strong = false)
+        {
+            var r = UIKit.Row(parent, 12);
+            UIKit.LE(UIKit.Txt(r, label, strong ? 26 : 24, strong ? Theme.Ink : Theme.Muted, strong ? FontStyle.Bold : FontStyle.Normal), flexW: 1, minW: 0);
+            UIKit.Txt(r, (v >= 0 ? "+" : "") + Fmt.Money(v), strong ? 26 : 24, strong ? (v >= 0 ? Theme.Turf : Theme.Red) : Theme.Ink, FontStyle.Bold, TextAnchor.UpperRight);
+        }
+
+        void SocialCard(Transform row, LifeData.SocialDef d)
+        {
+            bool done = game.S.season.doneActions.Contains("s:" + d.Id);
+            bool can = game.CanSocial(d.Id, out string why);
+            var t = SubCard(row, 16, 6);
+            UIKit.LE(t, flexW: 1, prefW: 0, minW: 0);
+            var name = UIKit.Txt(t, d.Name, 23, Theme.Ink, FontStyle.Bold);
+            name.resizeTextForBestFit = true; name.resizeTextMinSize = 16; name.resizeTextMaxSize = 23;
+            UIKit.LE(name, 58, 58);
+            var hint = UIKit.Muted(t, d.Hint, 19);
+            UIKit.LE(hint, flexH: 1);
+            long cost = game.SocialCost(d);
+            UIKit.Txt(t, $"Elenco +{d.Squad:0} · {(cost > 0 ? Fmt.Money(cost) : "de graça")}", 19, Theme.Turf, FontStyle.Bold);
+            string id = d.Id;
+            var b = done ? UIKit.Btn(t, "Feito", Theme.Card, Theme.Turf, null, 56, 22)
+                : can ? UIKit.Btn(t, "Bora", Theme.Turf, Theme.TurfInk, () => Commit(game.DoSocial(id)), 56, 22)
+                : UIKit.Btn(t, why ?? "Indisponível", Theme.Card, Theme.Muted, null, 56, 20);
+            b.interactable = !done && can;
+        }
+
+        void ShopCard(Transform line, GameData.Item it)
+        {
+            var p = game.S.player;
+            bool own = game.S.owned.Contains(it.Id);
+            var card = SubCard(line, 0, 0);
+            UIKit.LE(card, flexW: 1, prefW: 0, minW: 0);
+            // foto real se existir em Resources/Vida; senão, faixa com a categoria
+            var photo = Procedural.LifestyleSprite(it.Id);
+            var pic = UIKit.Img(card, photo != null ? Color.white : LifeColor(it.Cat), photo == null, "Foto");
+            if (photo != null) { pic.sprite = photo; pic.preserveAspect = true; }
+            else
+            {
+                var cat = UIKit.Txt(pic.transform, it.Cat.ToUpperInvariant(), 40, Theme.Alpha(Color.white, .9f), FontStyle.BoldAndItalic, TextAnchor.MiddleCenter);
+                UIKit.Stretch(cat.rectTransform);
+            }
+            UIKit.LE(pic, photo != null ? 170 : 80, photo != null ? 170 : 80);
+            if (own)
+            {
+                var tag = UIKit.Tag(pic.transform, "Seu", Theme.Turf, Theme.TurfInk);
+                tag.anchorMin = tag.anchorMax = tag.pivot = new Vector2(0, 1);
+                tag.anchoredPosition = new Vector2(12, -12);
+                tag.gameObject.AddComponent<ContentSizeFitter>().horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+                tag.GetComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            }
+            var info = UIKit.Column(card, 4);
+            info.GetComponent<VerticalLayoutGroup>().padding = new RectOffset(16, 16, 10, 16);
+            var name = UIKit.Txt(info, it.Name, 26, Theme.Ink, FontStyle.Bold);
+            name.resizeTextForBestFit = true; name.resizeTextMinSize = 18; name.resizeTextMaxSize = 26;
+            UIKit.LE(name, 32, 32);
+            UIKit.Txt(info, Fmt.Money(it.Price), 26, Theme.Gold, FontStyle.Bold);
+            UIKit.Muted(info, $"Fama +{it.Fame} · moral +{it.Moral}", 20);
+            UIKit.Muted(info, $"Manutenção {Fmt.Money(Game.ItemUpkeep(it))} por rodada", 20);
+            string id = it.Id;
+            var b = own ? UIKit.Btn(info, $"Vender por {Fmt.Money(Game.R1000(it.Price * .7))}", Theme.Card, Theme.Gold, () => Commit(game.SellItem(id)), 56, 22)
+                : UIKit.Primary(info, "Comprar", () => Commit(game.Buy(id)));
+            UIKit.LE(b, 56, 56);
+            b.interactable = own || p.money >= it.Price;
         }
 
         static Color LifeColor(string cat) => cat == "Carro" ? Color.Lerp(Theme.Red, Theme.Card, .35f)
-            : cat == "Casa" ? Color.Lerp(Theme.Cyan, Theme.Card, .45f) : Color.Lerp(Theme.Gold, Theme.Card, .4f);
+            : cat == "Casa" ? Color.Lerp(Theme.Cyan, Theme.Card, .45f) : cat == "Roupa" ? Color.Lerp(Theme.Purple, Theme.Card, .35f) : Color.Lerp(Theme.Gold, Theme.Card, .4f);
 
         /// <summary>Campanha da Seleção na Copa do Mundo, com a próxima partida para jogar.</summary>
         void WorldCupTile(Transform cols)

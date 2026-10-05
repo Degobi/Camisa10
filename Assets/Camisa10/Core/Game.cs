@@ -13,7 +13,7 @@ namespace Camisa10.Core
         public GameState S;
         public long Counter; // contraproposta pendente na negociação (não é salva)
 
-        public Game(GameState state) { S = state; EnsureProfile(); SyncClubs(); EnsureBusiness(); EnsureGlory(); EnsureLife(); EnsureTraits(); EnsureReputation(); EnsureInbox(); EnsureMarket(); EnsureObjectives(); }
+        public Game(GameState state) { S = state; EnsureProfile(); SyncClubs(); EnsureBusiness(); EnsureGlory(); EnsureLife(); EnsureTraits(); EnsureReputation(); EnsureInbox(); EnsureMarket(); EnsureObjectives(); fameSeen = S.player.fame; }
 
         /// <summary>Saves antigos não tinham identidade: gera uma e marca a versão atual do formato.</summary>
         void EnsureProfile()
@@ -99,15 +99,22 @@ namespace Camisa10.Core
         public long FairSalary(Club c) => R100(ClubWage(c) * Clamp(Math.Exp((Ovr - c.str) * .08), .3, 1.8) * (1 + S.player.fame / 300.0));
         long GoalBonusFor(long salary) => R100(salary * (IsAttacker ? .12 : .25));
 
+        // fama: os ganhos são amortecidos (quanto mais famoso, mais difícil crescer). Sem isso o jogador virava
+        // celebridade mundial na primeira temporada e o dinheiro de TV e patrocínio explodia.
+        [NonSerialized] float fameSeen = -1;
+        static float FameGainFactor(float f) => (float)Clamp(.42 * (1 - f / 110.0), .06, .42);
+
         public void Normalize()
         {
             var p = S.player;
+            if (fameSeen >= 0 && p.fame > fameSeen) p.fame = fameSeen + (p.fame - fameSeen) * FameGainFactor(fameSeen);
             p.energy = (float)Clamp(p.energy, 0, 100);
             p.moral = (float)Clamp(p.moral, 0, 100);
             p.fame = (float)Clamp(p.fame, 0, 100);
             p.coach = (float)Clamp(p.coach, 0, 100);
             p.squad = (float)Clamp(p.squad, 0, 100);
             p.fans = (float)Clamp(p.fans, 0, 100);
+            fameSeen = p.fame;
         }
 
         public void AddNews(string text)
