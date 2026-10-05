@@ -60,7 +60,7 @@ namespace Camisa10.UI
             var move = PickSkill(near, dist);
             bool timing = near != null && Mv(near).lunging; // na hora do bote é o momento certo
             float difficulty = move == SkillMove.Pedalada ? 0 : move == SkillMove.Elastico ? .08f : .13f;
-            float p = near == null ? 1f : Mathf.Clamp(.56f + (Stat(Attr.Dri) - 60) * .012f - opp01 * .15f - difficulty + (timing ? .22f : 0f), .15f, .93f);
+            float p = near == null ? 1f : Mathf.Clamp(.56f + (Stat(Attr.Dri) - 60) * .012f - opp01 * .15f - difficulty + (timing ? .22f : 0f) + (Has("driblador") ? .08f : 0f), .15f, .93f);
             StartCoroutine(DoSkill(move, near, Rng.Chance(p)));
         }
 

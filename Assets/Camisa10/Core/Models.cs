@@ -170,6 +170,9 @@ namespace Camisa10.Core
         // caixa de mensagens
         public List<InboxMsg> inbox = new List<InboxMsg>();
         public string agent;    // nome do empresário (fictício)
+        // especialidades e contadores que liberam algumas delas
+        public List<string> traits = new List<string>();
+        public int fkGoals, penGoals;
         [NonSerialized] public int mailsThisRound;
     }
 }

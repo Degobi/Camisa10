@@ -39,7 +39,7 @@ namespace Camisa10.Core
         public bool Home, Plays, Yellow, Sent, Done, GoalFlash, Motm;
         public string MotmName; // craque do jogo (você ou um jogador real de um dos times)
         public Role Role;
-        public int Gf, Ga, Goals, Assists, Minute;
+        public int Gf, Ga, Goals, Assists, Minute, FreeKickGoals, PenaltyGoals;
         public float Rating = 6f;
         /// <summary>Pontos das ações do jogador. Nota = 6,0 + pontos / 10 (entre 3 e 10).</summary>
         public int Points;
@@ -109,6 +109,7 @@ namespace Camisa10.Core
             {
                 double share = (90 - inMin) / 90.0;
                 lt *= 1 - .25 * share;
+                if (g.HasTrait("lider")) lt *= 1 + .06 * share; // o líder puxa o time
                 if (g.IsDefensive) lo *= 1 - .2 * share;
             }
             for (int i = Rng.Poisson(lt); i > 0; i--) queue.Add(new Ev { m = Rng.RangeInt(1, 90), t = 'g' });
@@ -169,7 +170,7 @@ namespace Camisa10.Core
             double skill = 0;
             foreach (var s in o.Skill) skill += s.weight * P.Get(s.attr);
             double diff = skill - (Opp.str - 4) + (Home ? 2 : 0) + (P.energy - 60) * .05 + (P.moral - 50) * .04;
-            return Game.Clamp(o.Base + diff * o.K, .05, .85);
+            return Game.Clamp(o.Base + diff * o.K + g.TraitBonus(Current?.Type, o.Kind), .05, .88);
         }
 
         static readonly string[] GoalTexts = { "Chute colocado no ângulo!", "Bomba no canto, sem chance para o goleiro!", "Por baixo das pernas do goleiro!", "Cavadinha de categoria!", "Chute cruzado, rede balançando!" };
@@ -186,7 +187,7 @@ namespace Camisa10.Core
             switch (opt.Kind)
             {
                 case "goal":
-                    if (ok) { Gf++; Goals++; Score("Gol", Pts.Goal); GoalFlash = true; Add($"{m}' GOL SEU! {(mo.Type == "cabeceio" ? "Cabeçada firme no canto!" : Rng.Pick(GoalTexts))}", FeedKind.TeamGoal); }
+                    if (ok) { Gf++; Goals++; Score("Gol", Pts.Goal); GoalFlash = true; if (mo.Type == "falta") FreeKickGoals++; if (mo.Type == "penalti") PenaltyGoals++; Add($"{m}' GOL SEU! {(mo.Type == "cabeceio" ? "Cabeçada firme no canto!" : Rng.Pick(GoalTexts))}", FeedKind.TeamGoal); }
                     else { Score("Finalização", Pts.ShotWide); Add($"{m}' {Rng.Pick(MissTexts)}", FeedKind.Me); }
                     break;
                 case "assist":
@@ -245,6 +246,8 @@ namespace Camisa10.Core
             {
                 case LiveOutcome.Goal:
                     Gf++; Goals++; GoalFlash = true;
+                    if (type == "falta") FreeKickGoals++;
+                    if (type == "penalti") PenaltyGoals++;
                     Add($"{m}' GOL SEU! {(type == "cabeceio" ? "Cabeçada firme no canto!" : type == "falta" ? "Cobrança perfeita!" : type == "penalti" ? "Pênalti batido com categoria!" : Rng.Pick(GoalTexts))}", FeedKind.TeamGoal);
                     break;
                 case LiveOutcome.PenaltyWon:

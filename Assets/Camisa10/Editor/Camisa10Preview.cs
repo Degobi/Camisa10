@@ -95,6 +95,7 @@ namespace Camisa10.EditorTools
             var game = Camisa10.Core.Game.NewCareer("Gabriel Souza", "ATA", new[] { 4, 4, 3, 3, 3, 3 });
             PlayRounds(game, 9); // tabela, artilharia e caixa de mensagens com cara de meio de temporada
             game.S.owned.Add("carro1"); // mostra um item comprado na vitrine
+            game.S.traits.AddRange(new[] { "finalizador", "velocista" }); game.S.captain = true; // selos na carta
             game.StartDating(); game.S.love.stage = 2; game.S.love.affection = 72; // vida pessoal preenchida
             game.S.rival.goals = 3; game.S.season.stats.goals = 4;
             typeof(Camisa10.Core.Game).GetMethod("PayWeek", flags).Invoke(game, new object[] { 1 }); // extrato de uma rodada com gol

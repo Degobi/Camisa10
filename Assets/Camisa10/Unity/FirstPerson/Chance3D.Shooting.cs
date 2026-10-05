@@ -161,12 +161,13 @@ namespace Camisa10.UI
             var b = A.Ball.transform.position;
             float dri = Stat(Attr.Dri);
             Vector3 spin;
-            float acc = type == "penalti" ? Stat(Attr.Fin) + 12 : Stat(Attr.Fin);
+            float acc = type == "penalti" ? Stat(Attr.Fin) + 12 + (Has("frieza") ? 10 : 0) : Stat(Attr.Fin) + (Has("finalizador") ? 8 : 0);
             float scale = 1f;
             if (type == "falta")
             {
                 // efeito escolhido nos botões: lateral para contornar a barreira, por cima para cair atrás dela
-                spin = new Vector3(8f + power * 6f, curveSteps * (11f + dri * .08f), 0);
+                spin = new Vector3(8f + power * 6f, curveSteps * (11f + dri * .08f) * (Has("cobrador") ? 1.25f : 1f), 0);
+                if (Has("cobrador")) acc += 10;
             }
             else if (finesse)
             {
@@ -242,7 +243,7 @@ namespace Camisa10.UI
         /// <summary>Cabeçada no tempo: mira arrastada antes, força e precisão pela qualidade do salto.</summary>
         void HeaderContact(float q)
         {
-            float acc = (Stat(Attr.Fin) + Stat(Attr.Fis)) / 2f * Mathf.Lerp(.55f, 1.12f, q);
+            float acc = ((Stat(Attr.Fin) + Stat(Attr.Fis)) / 2f + (Has("cabeceador") ? 8 : 0)) * Mathf.Lerp(.55f, 1.12f, q);
             if (q > .75f) { hud.Banner("NA MEDIDA!", Theme.FeedGold); StartCoroutine(HideBanner(.5f)); }
             sfx?.Kick(.5f, true);
             FireShot(aimPoint, Mathf.Lerp(.35f, .78f, q), new Vector3(Mathf.Lerp(2f, 6f, q), 0, 0), acc, .72f);

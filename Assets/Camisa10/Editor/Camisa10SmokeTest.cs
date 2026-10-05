@@ -121,6 +121,9 @@ namespace Camisa10.EditorTools
         static void StartNext()
         {
             var game = Game.NewCareer("Teste", "ATA", new[] { 4, 4, 3, 3, 3, 3 });
+            // todas as especialidades e a torcida cantando (ou vaiando) para passar pelos efeitos no lance
+            foreach (var t in Game.Traits) game.S.traits.Add(t.Id);
+            game.S.player.fans = index % 2 == 0 ? 90 : 10;
             var match = new MatchEngine(game) { Current = new Moment { Type = Types[index] == "gol" ? "chance" : Types[index], Text = "Teste automático", Options = new MomentOption[0] } };
             done = false; stage = 0; stepAt = Time.time; skillTried = false; celebrated = false;
             hud = ChanceHud.Build(canvasGo.transform);

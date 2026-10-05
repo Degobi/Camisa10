@@ -104,6 +104,7 @@ static class Program
             Console.WriteLine($"   Saldo de cada temporada: {string.Join(" | ", netBySeason.Select(x => Fmt.Money(x)))}");
             Console.WriteLine($"   Bens: {string.Join(", ", s.owned)}. Vida: {g.LoveLine()}. Rival {s.rival.name}: {s.rival.careerGoals} gols na carreira, duelos {s.rival.won}/{s.rival.duels}.");
             Console.WriteLine($"   Reputação: técnico {s.player.coach:0}, elenco {s.player.squad:0}, torcida {s.player.fans:0}{(s.captain ? ", capitão" : "")}. Mensagens na caixa: {s.inbox.Count}.");
+            Console.WriteLine($"   Especialidades: {string.Join(", ", s.traits)}. Gols de falta {s.fkGoals}, de pênalti {s.penGoals}.");
         }
         Console.WriteLine();
         Console.WriteLine($"Notas: média {allRatings.DefaultIfEmpty(0).Average():0.00}, mín {allRatings.DefaultIfEmpty(0).Min():0.0}, máx {allRatings.DefaultIfEmpty(0).Max():0.0} ({allRatings.Count} jogos)");

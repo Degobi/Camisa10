@@ -13,7 +13,7 @@ namespace Camisa10.Core
         public GameState S;
         public long Counter; // contraproposta pendente na negociação (não é salva)
 
-        public Game(GameState state) { S = state; EnsureProfile(); SyncClubs(); EnsureBusiness(); EnsureGlory(); EnsureLife(); EnsureReputation(); EnsureInbox(); EnsureObjectives(); }
+        public Game(GameState state) { S = state; EnsureProfile(); SyncClubs(); EnsureBusiness(); EnsureGlory(); EnsureLife(); EnsureTraits(); EnsureReputation(); EnsureInbox(); EnsureObjectives(); }
 
         /// <summary>Saves antigos não tinham identidade: gera uma e marca a versão atual do formato.</summary>
         void EnsureProfile()
@@ -393,6 +393,8 @@ namespace Camisa10.Core
             GloryAfterRound(m);
             LifeWeek(m);
             ReputationAfterMatch(m);
+            S.fkGoals += m.FreeKickGoals; S.penGoals += m.PenaltyGoals;
+            CheckTraits();
             InboxWeek(m, wasInjured);
             Normalize();
 
@@ -478,6 +480,7 @@ namespace Camisa10.Core
             S.contract.years--;
             p.age++;
             sm.notes.Add(Develop());
+            CheckTraits();
             Normalize();
 
             se.phase = "end";

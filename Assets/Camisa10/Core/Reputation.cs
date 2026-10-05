@@ -66,6 +66,7 @@ namespace Camisa10.Core
             p.squad += (50 - p.squad) * .02f;
             p.fans += (50 - p.fans) * .03f;
             if (S.captain) { p.moral += .5f; p.fame += .04f; }
+            if (HasTrait("idolo")) p.fame += .06f * (float)(1 - p.fame / 120.0);
             CaptaincyCheck();
         }
 

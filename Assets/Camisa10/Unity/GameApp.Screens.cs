@@ -603,6 +603,13 @@ namespace Camisa10.UI
 
             UIKit.Txt(inner.transform, p.name.ToUpperInvariant(), 48, Theme.Ink, FontStyle.Bold);
             UIKit.Muted(inner.transform, $"{p.age} anos · {GameData.Positions[p.pos].Name} · Brasil", 24);
+            // selos: capitão e especialidades liberadas
+            if (game.S.captain || game.S.traits.Count > 0)
+            {
+                var badges = UIKit.Grid(inner.transform, new Vector2(140, 44), 3, 8);
+                if (game.S.captain) TraitBadge(badges.transform, "C", "Capitão", true);
+                foreach (var id in game.S.traits) { var td = Game.Trait(id); if (td != null) TraitBadge(badges.transform, td.Icon, td.Name, false); }
+            }
             var ag = UIKit.Cols(inner.transform, 14);
             var ca = UIKit.Stack(ag, 1, 8);
             var cb = UIKit.Stack(ag, 1, 8);
@@ -628,6 +635,24 @@ namespace Camisa10.UI
             UIKit.KV(sc, "Gols", st.goals.ToString());
             UIKit.KV(sc, "Assistências", st.assists.ToString());
             UIKit.KV(sc, "Nota média", st.apps > 0 ? Fmt.Rating(game.AvgRating) : "-");
+            UIKit.KV(sc, "Craque do jogo", st.motm.ToString());
+
+            // especialidades: o que já tem e como liberar as outras
+            var sp = UIKit.Tile(mid, "Especialidades", Theme.Purple, 1, 24, 6);
+            UIKit.Muted(sp, "Liberadas por atributos e conquistas. Valem para sempre e ajudam no lance.", 20);
+            foreach (var td in Game.Traits)
+            {
+                bool has = game.HasTrait(td.Id);
+                var r = UIKit.Row(sp, 12);
+                var ic = UIKit.Img(r, has ? Theme.Purple : Theme.Chip, true, "Icone");
+                UIKit.LE(ic, 44, 44, prefW: 64, minW: 64);
+                var it = UIKit.Txt(ic.transform, td.Icon, 20, has ? Color.white : Theme.Muted, FontStyle.Bold, TextAnchor.MiddleCenter);
+                UIKit.Stretch(it.rectTransform);
+                var c2 = UIKit.Column(r, 0);
+                UIKit.LE(c2, flexW: 1, minW: 0);
+                UIKit.Txt(c2, td.Name, 24, has ? Theme.Ink : Theme.Muted, FontStyle.Bold);
+                UIKit.Txt(c2, has ? td.Effect : td.How, 20, has ? Theme.Turf : Theme.Muted);
+            }
 
             // chuteira e histórico
             var right = UIKit.Stack(cols, 1.1f);
@@ -682,6 +707,15 @@ namespace Camisa10.UI
                 UIKit.Label(hc, "Títulos e prêmios", Theme.Gold, 22);
                 foreach (var t in game.S.titles.Concat(game.S.awards)) UIKit.Body(hc, "• " + t);
             }
+        }
+
+        void TraitBadge(Transform parent, string icon, string name, bool gold)
+        {
+            var b = UIKit.Img(parent, gold ? Theme.Gold : Theme.Alpha(Theme.Purple, .9f), true, "Selo");
+            var h = UIKit.H(b.gameObject, 6, TextAnchor.MiddleCenter);
+            h.padding = new RectOffset(8, 8, 4, 4);
+            var t = UIKit.Txt(b.transform, gold ? "CAPITÃO" : name.ToUpperInvariant(), 18, gold ? Theme.GoldInk : Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+            t.resizeTextForBestFit = true; t.resizeTextMinSize = 12; t.resizeTextMaxSize = 18;
         }
 
         void HistoryLine(Transform parent, string year, CareerRecord rec, string club, string j, string g, string a, string nota, bool head)

@@ -14,7 +14,7 @@ namespace Camisa10.UI
 
         void CorteContact(float q)
         {
-            float duel = Mathf.Clamp(.5f + ((Stat(Attr.Def) + Stat(Attr.Fis)) / 2f - 60f) * .012f - opp01 * .15f + q * .25f, .15f, .95f);
+            float duel = Mathf.Clamp(.5f + ((Stat(Attr.Def) + Stat(Attr.Fis)) / 2f - 60f) * .012f - opp01 * .15f + q * .25f + (Has("muralha") ? .08f : 0f), .15f, .95f);
             if (!Rng.Chance(duel)) { AttackerHeads("ELE GANHOU NO ALTO"); return; }
             float side = headPoint.x >= 0 ? 1 : -1;
             var away = new Vector3(Mathf.Clamp(headPoint.x + side * R(6, 16), -32, 32), 0, headPoint.z - R(16, 30));
@@ -52,7 +52,7 @@ namespace Camisa10.UI
             var start = A.Ball.transform.position;
             var run = Flat(mateTarget - mate.position);
             var lead = Flat(mate.position) + (run.sqrMagnitude > .01f ? run.normalized * Mathf.Min(2.5f, run.magnitude) : Vector3.zero);
-            float sigma = Mathf.Max(.25f, 2.0f - Stat(Attr.Pas) * .016f);
+            float sigma = Mathf.Max(.25f, 2.0f - Stat(Attr.Pas) * .016f) * (Has("maestro") ? .7f : 1f);
             var target = new Vector3(lead.x + (float)Rng.Gauss() * sigma, 1.85f, lead.z + (float)Rng.Gauss() * sigma);
             float speed = R(16, 19);
             curveAccel = 0;

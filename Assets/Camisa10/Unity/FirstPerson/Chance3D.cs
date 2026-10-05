@@ -25,6 +25,8 @@ namespace Camisa10.UI
         float opp01;
         Player P => g.S.player;
         float Stat(Attr a) => P.Get(a);
+        /// <summary>Especialidade do jogador (Finalizador, Driblador...): pequenos ganhos reais no lance.</summary>
+        bool Has(string trait) => g != null && g.HasTrait(trait);
 
         Phase phase = Phase.Aim;
         float startTime, shotTime, aimTimeout = 9f;
@@ -331,7 +333,11 @@ namespace Camisa10.UI
             // apresentação do lance antes de liberar o controle
             introUntil = Time.time + 1.4f;
             if (type == "falta") sfx?.Whistle();
-            hud.Intro($"{m.Minute}'  {m.Current.Text}");
+            // a arquibancada reage a quem está com a bola: ídolo ouve o próprio nome, quem está em baixa ouve vaia
+            string crowdLine = g != null && g.FansChant ? "\nA TORCIDA CANTA O SEU NOME!" : g != null && g.FansBoo ? "\nVaias na arquibancada..." : "";
+            hud.Intro($"{m.Minute}'  {m.Current.Text}{crowdLine}");
+            if (g != null && g.FansChant) { sfx?.Cheer(.5f); A.Crowd?.Excite(.6f, 2.2f); }
+            else if (g != null && g.FansBoo) sfx?.Boo();
             startTime = introUntil;
             prevBall = A.Ball.transform.position;
         }
@@ -525,7 +531,7 @@ namespace Camisa10.UI
                 var gp = ray.origin + ray.direction * (-ray.origin.y / ray.direction.y);
                 if (gp.z < -2f) { Pass(gp, power01); return; }
             }
-            Shot(GoalTarget(ray), power01, s.Bend, Stat(Attr.Fin), 1f);
+            Shot(GoalTarget(ray), power01, s.Bend, Stat(Attr.Fin) + (Has("finalizador") ? 8 : 0), 1f);
         }
 
         void Shot(Vector3 target, float power01, float bend, float accuracyAttr, float powerScale)
@@ -555,7 +561,7 @@ namespace Camisa10.UI
         void Pass(Vector3 groundPoint, float power01)
         {
             var start = A.Ball.transform.position;
-            float sigma = Mathf.Max(.2f, 1.8f - Stat(Attr.Pas) * .014f);
+            float sigma = Mathf.Max(.2f, 1.8f - Stat(Attr.Pas) * .014f) * (Has("maestro") ? .7f : 1f);
             var target = new Vector3(groundPoint.x + (float)Rng.Gauss() * sigma, Arena.BallRadius, groundPoint.z + (float)Rng.Gauss() * sigma);
             float dist = HorizDist(start, target);
             float speed = Mathf.Clamp(dist * .9f + 4f, 9f, 20f) * Mathf.Lerp(.9f, 1.15f, power01);
@@ -585,7 +591,7 @@ namespace Camisa10.UI
             A.Ball.isKinematic = true;
             A.Ball.transform.position = headPoint;
             var ray = A.Cam.ScreenPointToRay(s.End);
-            float accuracy = (Stat(Attr.Fin) + Stat(Attr.Fis)) / 2f;
+            float accuracy = (Stat(Attr.Fin) + Stat(Attr.Fis)) / 2f + (Has("cabeceador") ? 8 : 0);
             Shot(GoalTarget(ray), .5f, 0, accuracy, .72f);
         }
 
@@ -597,7 +603,7 @@ namespace Camisa10.UI
 
         void DefenseTry(int side)
         {
-            float d = meZ - attacker.position.z, bonus = Stat(Attr.Def) * .004f;
+            float d = meZ - attacker.position.z, bonus = Stat(Attr.Def) * .004f + (Has("muralha") ? .06f : 0f);
             bool win;
             if (cutStart < 0) win = d <= 6f && side == cutSide && Rng.Chance(.55 + bonus);
             else win = Time.time - cutStart <= .32f + bonus && side == cutSide && Rng.Chance(.78 + bonus * .5);
@@ -746,7 +752,7 @@ namespace Camisa10.UI
             if (stamina < .02f) sprintTired = true;
             if (sprintTired && stamina > .25f) sprintTired = false;
             bool sprint = wantSprint && !sprintTired;
-            stamina = Mathf.Clamp01(stamina + (sprint ? -.16f : stk.sqrMagnitude > .04f ? .09f : .14f) * dt);
+            stamina = Mathf.Clamp01(stamina + (sprint ? (Has("velocista") ? -.11f : -.16f) : stk.sqrMagnitude > .04f ? .09f : .14f) * dt);
             hud.SetStamina(stamina);
             hud.SprintOn(sprint);
             float dri01 = Mathf.Clamp01((Stat(Attr.Dri) - 40f) / 55f);
@@ -986,7 +992,7 @@ namespace Camisa10.UI
             if (near == null) return; // sem marcador perto: só uma arrancada
             // driblar no momento do bote é o certo: ele já se jogou e não volta
             bool timing = Mv(near).lunging;
-            float p = Mathf.Clamp(.48f + (Stat(Attr.Dri) - 60) * .011f - opp01 * .18f + (timing ? .3f : 0f), .25f, .93f);
+            float p = Mathf.Clamp(.48f + (Stat(Attr.Dri) - 60) * .011f - opp01 * .18f + (timing ? .3f : 0f) + (Has("driblador") ? .08f : 0f), .25f, .93f);
             if (Rng.Chance(p))
             {
                 Mv(near).lunging = false;
@@ -1032,8 +1038,8 @@ namespace Camisa10.UI
                 float side = start.x > 0 ? 1 : -1;
                 float tt = Launch(start, headPoint, HorizDist(start, headPoint) / T, new Vector3(0, side * R(6, 14), 0));
                 float arrive = Time.time + tt;
-                windowOpen = arrive - .3f - Stat(Attr.Fis) * .002f;
-                windowClose = arrive + .12f;
+                windowOpen = arrive - .3f - Stat(Attr.Fis) * .002f - (Has("cabeceador") ? .08f : 0f);
+                windowClose = arrive + .12f + (Has("cabeceador") ? .06f : 0f);
                 headArrive = arrive;
             }
             if (!crossLaunched) return;
