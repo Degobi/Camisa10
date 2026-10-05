@@ -368,6 +368,7 @@ namespace Camisa10.Core
             if (m.Plays)
             {
                 st.apps++; st.goals += m.Goals; st.assists += m.Assists; st.ratings.Add(m.Rating);
+                if (m.Motm) { st.motm++; p.fame += (float)(.4 * L.FameMult * (1 - p.fame / 115.0)); AddFans(1.5f); }
                 p.form.Add(m.Rating); if (p.form.Count > 5) p.form.RemoveAt(0);
                 p.moral += (m.Rating - 6.5f) * 4 + (m.Result == 'w' ? 3 : m.Result == 'l' ? -3 : 0);
                 p.coach += (m.Rating - 6.5f) * 3;

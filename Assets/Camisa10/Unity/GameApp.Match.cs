@@ -138,7 +138,7 @@ namespace Camisa10.UI
                     UIKit.Txt(dock, PointsBreakdown(match), 24, Theme.Ink, FontStyle.Normal, TextAnchor.UpperCenter);
                 }
                 else UIKit.Muted(dock, "Você não entrou em campo nesta rodada.").alignment = TextAnchor.UpperCenter;
-                UIKit.GoldBtn(dock, "Concluir rodada", EndMatchUI);
+                UIKit.GoldBtn(dock, "Pós-jogo  ›", EndMatchUI);
             }
             else
             {
@@ -239,14 +239,16 @@ namespace Camisa10.UI
         {
             if (match == null || !match.Done) return;
             if (matchCo != null) StopCoroutine(matchCo);
+            var before = TakeSnap();
             string wcLine = worldCupMatch ? game.FinishWorldCupMatch(match) : null;
             if (!worldCupMatch) game.FinishMatch(match);
             worldCupMatch = false;
+            var done = match;
             match = null;
             Destroy(matchRoot);
-            Commit(null, true);
-            if (game.S.mailsThisRound > 0) Toast(game.S.mailsThisRound == 1 ? "Você tem uma mensagem nova." : $"Você tem {game.S.mailsThisRound} mensagens novas.");
-            if (wcLine != null) ShowModal(game.S.wc.champion ? "CAMPEÃO DO MUNDO!" : "Copa do Mundo", wcLine, ("Continuar", (Action)CloseModal, true));
+            Save();
+            Render(true);
+            ShowPostMatch(done, before, wcLine);
         }
     }
 }

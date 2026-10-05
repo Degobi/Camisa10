@@ -16,7 +16,7 @@ static class Program
         Rng.Seed(seed);
         int errors = 0;
         var allRatings = new List<float>();
-        int wcPlayed = 0, wcWon = 0, events = 0, penalties = 0, foreign = 0, actions = 0, mails = 0, replies = 0, captains = 0;
+        int wcPlayed = 0, wcWon = 0, events = 0, penalties = 0, foreign = 0, actions = 0, mails = 0, replies = 0, captains = 0, press = 0, motm = 0;
         var leaguesSeen = new Dictionary<string, int>();
 
         for (int k = 0; k < n; k++)
@@ -56,7 +56,11 @@ static class Program
                         var m = new MatchEngine(g);
                         Play(m, ref penalties);
                         if (m.Plays) allRatings.Add(m.Rating);
+                        if (m.Motm) motm++;
                         g.FinishMatch(m);
+                        // entrevista coletiva em metade dos jogos, com respostas sorteadas
+                        if ((m.Plays || m.Role == Role.Reserva) && Rng.Chance(.5))
+                            foreach (var q in PressConference.Build(g, m)) { PressConference.Answer(g, q, Rng.RangeInt(0, q.Answers.Length - 1)); press++; }
                     }
                     // Copa do Mundo (anos de Copa)
                     if (g.WorldCupActive) wcPlayed++;
@@ -105,6 +109,7 @@ static class Program
         Console.WriteLine($"Notas: média {allRatings.DefaultIfEmpty(0).Average():0.00}, mín {allRatings.DefaultIfEmpty(0).Min():0.0}, máx {allRatings.DefaultIfEmpty(0).Max():0.0} ({allRatings.Count} jogos)");
         Console.WriteLine($"Distribuição: <6: {allRatings.Count(r => r < 6) * 100 / Math.Max(1, allRatings.Count)}%  6-7: {allRatings.Count(r => r >= 6 && r < 7) * 100 / Math.Max(1, allRatings.Count)}%  7-8: {allRatings.Count(r => r >= 7 && r < 8) * 100 / Math.Max(1, allRatings.Count)}%  8+: {allRatings.Count(r => r >= 8) * 100 / Math.Max(1, allRatings.Count)}%");
         Console.WriteLine($"Copas do Mundo disputadas: {wcPlayed}, vencidas: {wcWon}. Eventos: {events}. Ações da agenda: {actions}. Pênaltis no jogo: {penalties}.");
+        Console.WriteLine($"Craque do jogo: {motm} vezes ({motm * 100 / Math.Max(1, allRatings.Count)}% dos jogos). Perguntas de coletiva respondidas: {press}.");
         Console.WriteLine($"Respostas a mensagens: {replies}. Carreiras que chegaram a capitão: {captains} de {n}.");
         Console.WriteLine($"Temporadas por liga: {string.Join(", ", leaguesSeen.Select(x => x.Key + "=" + x.Value))}. Fora do Brasil: {foreign}.");
         Console.WriteLine(errors == 0 ? "OK: nenhuma exceção." : $"{errors} carreira(s) com erro.");

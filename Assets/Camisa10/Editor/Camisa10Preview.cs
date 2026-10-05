@@ -115,12 +115,33 @@ namespace Camisa10.EditorTools
             var scaler = go.GetComponentInChildren<UnityEngine.UI.CanvasScaler>();
 
             var scroll = (UnityEngine.UI.ScrollRect)t.GetField("scroll", flags).GetValue(app);
-            foreach (var shot in new[] { "home", "home-baixo", "inbox", "player", "life", "life-baixo", "agenda", "settings", "trophies", "fim" })
+            foreach (var shot in new[] { "home", "home-baixo", "inbox", "player", "life", "life-baixo", "agenda", "settings", "trophies", "posjogo", "coletiva", "fim" })
             {
                 string tab = shot.Replace("-baixo", "");
-                if (shot == "fim") { PlayRounds(game, 99); tab = "home"; } // fim de temporada: balanço, objetivos e propostas
+                if (shot == "posjogo" || shot == "coletiva" || shot == "fim") tab = "home";
+                if (shot == "fim")
+                {
+                    // fecha o pós-jogo e joga até o fim da temporada: balanço, objetivos e propostas
+                    t.GetMethod("CloseModal", flags).Invoke(app, null);
+                    var pr = (GameObject)t.GetField("postRoot", flags).GetValue(app);
+                    if (pr != null) Object.DestroyImmediate(pr);
+                    PlayRounds(game, 99);
+                }
                 t.GetField("tab", flags).SetValue(app, tab);
-                t.GetMethod("Render", flags).Invoke(app, new object[] { true });
+                if (shot != "coletiva") t.GetMethod("Render", flags).Invoke(app, new object[] { true });
+                if (shot == "posjogo")
+                {
+                    var snap = t.GetMethod("TakeSnap", flags).Invoke(app, null);
+                    var m = PlayMatch(game);
+                    game.FinishMatch(m);
+                    t.GetMethod("Render", flags).Invoke(app, new object[] { true });
+                    t.GetMethod("ShowPostMatch", flags).Invoke(app, new object[] { m, snap, null });
+                }
+                if (shot == "coletiva")
+                {
+                    var m = (MatchEngine)t.GetField("postMatch", flags).GetValue(app);
+                    t.GetMethod("PressStep", flags).Invoke(app, new object[] { PressConference.Build(game, m), 0 });
+                }
                 if (shot.EndsWith("-baixo"))
                 {
                     Canvas.ForceUpdateCanvases();
@@ -152,18 +173,23 @@ namespace Camisa10.EditorTools
         /// <summary>Joga rodadas com resultados sorteados (treino, lances e eventos), para as fotos terem uma carreira de verdade.</summary>
         static void PlayRounds(Camisa10.Core.Game g, int rounds)
         {
-            for (int i = 0; i < rounds && g.S.season.phase != "end"; i++)
+            for (int i = 0; i < rounds && g.S.season.phase != "end"; i++) g.FinishMatch(PlayMatch(g));
+        }
+
+        /// <summary>Treina e joga uma partida até o apito final (sem registrar na tabela).</summary>
+        static MatchEngine PlayMatch(Camisa10.Core.Game g)
+        {
+            if (g.S.player.injury > 0) g.Physio(); else g.Train(Camisa10.Core.Game.MainAttr(g.S.player.pos), "normal", out _);
+            var m = new MatchEngine(g);
+            int guard = 0;
+            while (!m.Done && guard++ < 200)
             {
-                if (g.S.player.injury > 0) g.Physio(); else g.Train(Camisa10.Core.Game.MainAttr(g.S.player.pos), "normal", out _);
-                var m = new MatchEngine(g);
-                int guard = 0;
-                while (!m.Done && guard++ < 200)
-                {
-                    if (m.Step() != StepResult.AwaitChoice || m.Current == null) continue;
-                    m.ResolveLive(Rng.Chance(.35) ? LiveOutcome.Goal : Rng.Chance(.3) ? LiveOutcome.Assist : LiveOutcome.Saved);
-                }
-                g.FinishMatch(m);
+                if (m.Step() != StepResult.AwaitChoice || m.Current == null) continue;
+                if (Rng.Chance(.5)) m.Score("Drible", MatchEngine.Pts.Dribble);
+                if (Rng.Chance(.3)) m.Score("Passe certo", MatchEngine.Pts.Pass);
+                m.ResolveLive(Rng.Chance(.35) ? LiveOutcome.Goal : Rng.Chance(.3) ? LiveOutcome.Assist : LiveOutcome.Saved);
             }
+            return m;
         }
 
         /// <summary>Salva qualquer textura (mesmo sem cópia na CPU) em PNG.</summary>

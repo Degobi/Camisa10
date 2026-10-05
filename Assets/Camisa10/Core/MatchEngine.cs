@@ -36,7 +36,8 @@ namespace Camisa10.Core
         Player P => g.S.player;
 
         public Club My, Opp;
-        public bool Home, Plays, Yellow, Sent, Done, GoalFlash;
+        public bool Home, Plays, Yellow, Sent, Done, GoalFlash, Motm;
+        public string MotmName; // craque do jogo (você ou um jogador real de um dos times)
         public Role Role;
         public int Gf, Ga, Goals, Assists, Minute;
         public float Rating = 6f;
@@ -285,7 +286,12 @@ namespace Camisa10.Core
                 if (Result == 'w') Score("Vitória", Pts.Win);
                 else if (Result == 'l') Score("Derrota", Pts.Loss);
                 if (Ga == 0 && g.IsDefensive) Score("Sem sofrer gols", Pts.CleanSheet);
+                // craque do jogo: nota alta quase sempre leva; dois gols ajudam
+                double c = Rating >= 8.6 ? .9 : Rating >= 8 ? .6 : Rating >= 7.5 ? .3 : Rating >= 7.1 ? .1 : 0;
+                if (Goals >= 2) c += .2;
+                Motm = Rng.Chance(c);
             }
+            MotmName = Motm ? P.name : GameData.Outfield(Result == 'l' ? Opp.name : My.name);
             Add($"90' Fim de jogo: {My.name} {Gf} x {Ga} {Opp.name}.", FeedKind.Info);
             Done = true; GoalFlash = false;
         }

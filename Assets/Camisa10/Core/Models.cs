@@ -37,7 +37,7 @@ namespace Camisa10.Core
         public int Gd => gf - ga;
     }
 
-    [Serializable] public class SeasonStats { public int apps, goals, assists; public List<float> ratings = new List<float>(); }
+    [Serializable] public class SeasonStats { public int apps, goals, assists, motm; public List<float> ratings = new List<float>(); }
 
     [Serializable]
     public class SeasonSummary
