@@ -244,7 +244,10 @@ namespace Camisa10.UI
             var im = Img(parent, bg, true, "Tag");
             var h = H(im.gameObject, 0, TextAnchor.MiddleCenter);
             h.padding = new RectOffset(16, 16, 6, 6);
-            Txt(im.transform, (text ?? "").ToUpperInvariant(), 22, fg, FontStyle.Bold);
+            var t = Txt(im.transform, (text ?? "").ToUpperInvariant(), 22, fg, FontStyle.Bold);
+            // o selo não encolhe nem quebra linha quando o bloco é estreito
+            t.horizontalOverflow = HorizontalWrapMode.Overflow;
+            LE(im, minW: t.preferredWidth + 34);
             return im.rectTransform;
         }
 

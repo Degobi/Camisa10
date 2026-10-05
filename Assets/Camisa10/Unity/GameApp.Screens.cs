@@ -26,8 +26,8 @@ namespace Camisa10.UI
             {
                 Meter(parent, "Energia", p.energy);
                 Meter(parent, "Moral", p.moral);
-                Meter(parent, "Relação com o técnico", p.coach);
                 Meter(parent, "Fama", p.fame);
+                Reputation(parent);
                 return;
             }
             var cols = UIKit.Cols(parent, 30);
@@ -35,8 +35,17 @@ namespace Camisa10.UI
             var b = UIKit.Stack(cols, 1, 14);
             Meter(a, "Energia", p.energy);
             Meter(a, "Moral", p.moral);
-            Meter(b, "Relação com o técnico", p.coach);
-            Meter(b, "Fama", p.fame);
+            Meter(a, "Fama", p.fame);
+            Reputation(b);
+        }
+
+        /// <summary>Reputação em três frentes: técnico, elenco e torcida.</summary>
+        void Reputation(Transform parent)
+        {
+            var p = game.S.player;
+            Meter(parent, "Técnico", p.coach);
+            Meter(parent, "Elenco · " + Game.SquadLabel(p.squad).ToLowerInvariant(), p.squad);
+            Meter(parent, "Torcida · " + Game.FansLabel(p.fans).ToLowerInvariant(), p.fans);
         }
 
         void Meter(Transform parent, string label, float v)
@@ -182,15 +191,19 @@ namespace Camisa10.UI
             // linha 1: próximo jogo, semana, condição
             var row1 = UIKit.Cols(content);
 
-            var next = UIKit.Tile(row1, "Próximo jogo", Theme.Turf, 1.25f);
+            var leftCol = UIKit.Stack(row1, 1.25f);
+            bool derby = Game.IsDerby(game.MyClub.name, f.opp.name);
+            var next = UIKit.Tile(leftCol, derby ? "Próximo jogo · clássico" : "Próximo jogo", derby ? Theme.Red : Theme.Turf);
             UIKit.Muted(next, $"{Game.League(se.league).Name} · rodada {se.week + 1} de {game.SeasonRounds} · {(f.home ? "em casa" : "fora de casa")}");
             var vs = UIKit.Row(next, 10, TextAnchor.MiddleCenter);
-            TeamColumn(vs, f.home ? game.MyClub : f.opp, Theme.Ink, 120);
+            TeamColumn(vs, f.home ? game.MyClub : f.opp, Theme.Ink, 100);
             var x = UIKit.Txt(vs, "VS", 44, Theme.Muted, FontStyle.Bold, TextAnchor.MiddleCenter);
             UIKit.LE(x, prefW: 90);
-            TeamColumn(vs, f.home ? f.opp : game.MyClub, Theme.Ink, 120);
+            TeamColumn(vs, f.home ? f.opp : game.MyClub, Theme.Ink, 100);
             int oppPos = game.SortedTable().FindIndex(t => t.club == f.opp.id) + 1;
-            UIKit.Muted(next, $"Adversário: {oppPos}º na tabela, força {f.opp.str}.").alignment = TextAnchor.UpperCenter;
+            string extra = f.opp.id == game.S.rival.club && !string.IsNullOrEmpty(game.S.rival.name) ? $" Duelo com o seu rival, {game.S.rival.name}." : derby ? " A torcida não aceita perder." : "";
+            UIKit.Muted(next, $"Adversário: {oppPos}º na tabela, força {f.opp.str}.{extra}").alignment = TextAnchor.UpperCenter;
+            ObjectivesTile(leftCol);
 
             var week = UIKit.Tile(row1, se.phase == "train" ? "Semana de treino" : "Dia de jogo", Theme.Cyan, 1f);
             if (se.phase == "train")
@@ -253,9 +266,11 @@ namespace Camisa10.UI
             UIKit.KV(biz, "Empresas (renda por rodada)", Fmt.Money(game.VenturesWeekly));
             UIKit.Ghost(biz, "Ver negócios", () => { tab = "business"; Render(true); });
 
-            var news = UIKit.Tile(row2, "Notícias", Theme.Cyan, .8f);
+            var right = UIKit.Stack(row2, .8f);
+            HomeInbox(right);
+            var news = UIKit.Tile(right, "Notícias", Theme.Muted);
             if (game.S.news.Count == 0) UIKit.Muted(news, "Nada por aqui ainda.");
-            foreach (var item in game.S.news.Take(5))
+            foreach (var item in game.S.news.Take(3))
             {
                 var col = UIKit.Column(news, 2);
                 UIKit.Label(col, item.when, Theme.Muted, 20);
@@ -263,6 +278,27 @@ namespace Camisa10.UI
             }
 
             HomeGlory();
+        }
+
+        /// <summary>Objetivos da temporada com barra de progresso (resultado final depois do último jogo).</summary>
+        void ObjectivesTile(Transform parent)
+        {
+            var se = game.S.season;
+            if (se.objectives == null || se.objectives.Count == 0) return;
+            var t = UIKit.Tile(parent, "Objetivos da temporada", Theme.Gold, 1, 24, 6);
+            foreach (var o in se.objectives)
+            {
+                bool done = o.result == "ok" || (o.result == "" && game.ObjMet(o));
+                bool lost = o.result == "falhou" || (o.result == "" && game.ObjLost(o));
+                var r = UIKit.Row(t, 12);
+                UIKit.Tag(r, o.club ? "Diretoria" : "Técnico", o.club ? Theme.Alpha(Theme.Cyan, .2f) : Theme.Alpha(Theme.Turf, .2f), o.club ? Theme.Cyan : Theme.Turf);
+                var l = UIKit.Txt(r, game.ObjText(o), 25, Theme.Ink, FontStyle.Bold);
+                UIKit.LE(l, flexW: 1, minW: 0);
+                string status = o.result == "ok" ? "Cumprido" : o.result == "falhou" ? "Não cumprido" : game.ObjProgressText(o);
+                var st = UIKit.Txt(r, status, 22, done ? Theme.Turf : lost ? Theme.Red : Theme.Muted, FontStyle.Bold, TextAnchor.MiddleRight);
+                UIKit.LE(st, minW: st.preferredWidth + 4);
+                UIKit.Bar(t, done ? 1 : game.ObjProgress01(o), done ? Theme.Turf : lost ? Theme.Red : Theme.Gold, 10);
+            }
         }
 
         void DoTrain()
@@ -329,6 +365,7 @@ namespace Camisa10.UI
             foreach (var t in sm.notes) UIKit.Body(mid, "• " + t);
 
             if (game.S.wc != null && game.S.wc.year == se.year && game.S.wc.matches.Count > 0) WorldCupTile(cols);
+            else ObjectivesTile(cols);
 
             var f = UIKit.Tile(cols, "Seu futuro", Theme.Cyan);
             string txt = expired ? "Seu contrato terminou. Escolha uma proposta para continuar jogando."

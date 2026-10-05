@@ -17,6 +17,7 @@ namespace Camisa10.Core
         public int[] attrs = new int[6];
         public float[] xp = new float[6];
         public float energy, moral, fame, coach;
+        public float squad, fans; // reputação com o elenco e com a torcida (0 a 100)
         public long money;
         public List<float> form = new List<float>();
         public BootStyle boot = new BootStyle();
@@ -62,6 +63,8 @@ namespace Camisa10.Core
         public List<CupTie> cup = new List<CupTie>();           // jogos da copa nesta temporada
         public bool cupOut, cupWon;
         public int cupGoals, monthMark;                         // gols na copa; início da janela do prêmio do mês
+        public List<Objective> objectives = new List<Objective>(); // objetivos do técnico e da diretoria
+        public int objMet = -1;                                  // objetivos cumpridos (fim de temporada; -1 = ainda não avaliado)
     }
 
     [Serializable]
@@ -162,5 +165,11 @@ namespace Camisa10.Core
         public Statement lastWeek = new Statement();
         public long seasonNet;  // saldo acumulado na temporada (salário e negócios menos impostos e despesas)
         public int debtWeeks;   // rodadas seguidas no vermelho
+        // reputação e capitania
+        public bool repInit, captain, captainOffered;
+        // caixa de mensagens
+        public List<InboxMsg> inbox = new List<InboxMsg>();
+        public string agent;    // nome do empresário (fictício)
+        [NonSerialized] public int mailsThisRound;
     }
 }

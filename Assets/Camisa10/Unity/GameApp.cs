@@ -50,7 +50,7 @@ namespace Camisa10.UI
         // abas do menu principal (ordem da barra)
         static readonly (string id, string label)[] Tabs =
         {
-            ("home", "Central"), ("agenda", "Agenda"), ("player", "Jogador"), ("trophies", "Troféus"), ("business", "Negócios"),
+            ("home", "Central"), ("inbox", "Mensagens"), ("agenda", "Agenda"), ("player", "Jogador"), ("trophies", "Troféus"), ("business", "Negócios"),
             ("contract", "Contrato"), ("sponsors", "Patrocínio"), ("life", "Vida"), ("settings", "Ajustes"),
         };
 
@@ -211,10 +211,12 @@ namespace Camisa10.UI
             else
             {
                 SetChrome(true);
+                if (tab == "inbox") PrepareInbox();
                 BuildHeader();
                 BuildNav();
                 switch (tab)
                 {
+                    case "inbox": BuildInbox(); break;
                     case "agenda": BuildAgenda(); break;
                     case "player": BuildPlayer(); break;
                     case "trophies": BuildTrophies(); break;
@@ -249,7 +251,7 @@ namespace Camisa10.UI
             UIKit.Crest(header, c, 62, 74);
             var col = UIKit.Column(header, 0);
             UIKit.LE(col, flexW: 1, minW: 0, prefW: 0);
-            var tag = UIKit.Label(col, $"Modo carreira · {c.name} · v{Version}", Theme.Turf, 22);
+            var tag = UIKit.Label(col, $"Modo carreira · {c.name}{(game.S.captain ? " · capitão" : "")} · v{Version}", Theme.Turf, 22);
             FitLine(tag, 16, 30);
             var name = UIKit.Txt(col, p.name, 40, Theme.Ink, FontStyle.Bold, TextAnchor.MiddleLeft);
             FitLine(name, 24, 50);
@@ -317,6 +319,18 @@ namespace Camisa10.UI
                 var t = UIKit.Txt(im.transform, text, 26, cur ? Theme.Ink : Theme.Muted, FontStyle.Bold, TextAnchor.MiddleCenter);
                 UIKit.Stretch(t.rectTransform);
                 t.resizeTextForBestFit = true; t.resizeTextMinSize = 16; t.resizeTextMaxSize = 26;
+                // selo vermelho com as mensagens não lidas
+                int unread = id == "inbox" ? game.UnreadCount : 0;
+                if (unread > 0)
+                {
+                    var badge = UIKit.Img(im.transform, Theme.Red, false, "Badge");
+                    badge.sprite = UIKit.Circle;
+                    var brt = badge.rectTransform;
+                    brt.anchorMin = brt.anchorMax = new Vector2(1, .5f); brt.pivot = new Vector2(1, .5f);
+                    brt.sizeDelta = new Vector2(34, 34); brt.anchoredPosition = new Vector2(-2, 14);
+                    var bt = UIKit.Txt(badge.transform, unread > 9 ? "9+" : unread.ToString(), 20, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+                    UIKit.Stretch(bt.rectTransform);
+                }
                 if (cur)
                 {
                     var bar = UIKit.Img(im.transform, Theme.Turf, false, "Indicator");

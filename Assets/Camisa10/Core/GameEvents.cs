@@ -21,11 +21,11 @@ namespace Camisa10.Core
                 Opt("Ficar em casa", x => { x.S.player.coach += 3; x.S.player.energy += 5; return "Você descansou. O técnico reparou no seu profissionalismo."; }))),
 
             (g => g.S.season.lastRole == Role.Reserva, 1.3, g => Ev("Entrevista após o treino", "Um repórter pergunta se você está insatisfeito por começar no banco.",
-                Opt("Criticar o técnico", x => { var p = x.S.player; p.coach -= 15; p.fame += 3; p.moral += 2; return "A declaração virou manchete. O clima com o técnico pesou."; }),
+                Opt("Criticar o técnico", x => { var p = x.S.player; x.AddSquad(-3); x.AddFans(2); p.coach -= 15; p.fame += 3; p.moral += 2; return "A declaração virou manchete. O clima com o técnico pesou."; }),
                 Opt("Responder com diplomacia", x => { x.S.player.coach += 5; return "\"Vou continuar trabalhando.\" O técnico gostou da resposta."; }))),
 
             (g => true, 1, g => Ev("Visita ao hospital infantil", "O clube organiza uma ação social no seu dia de folga.",
-                Opt("Participar", x => { var p = x.S.player; p.fame += 2; p.moral += 5; p.energy -= 5; return "As crianças adoraram. Você saiu de lá renovado."; }),
+                Opt("Participar", x => { var p = x.S.player; x.AddFans(3); p.fame += 2; p.moral += 5; p.energy -= 5; return "As crianças adoraram. Você saiu de lá renovado."; }),
                 Opt("Ficar de fora", x => { x.S.player.fame -= 1; return "Você aproveitou a folga. Alguns torcedores notaram sua ausência."; }))),
 
             (g => g.S.player.money >= 60000, .8, g => {
@@ -39,7 +39,7 @@ namespace Camisa10.Core
             (g => true, 1, g => {
                 var a = g.WeakestAttr(); string l = GameData.Label(a).ToLowerInvariant();
                 return Ev("Treino extra com o capitão", $"O capitão se oferece para treinar {l} com você depois do horário.",
-                    Opt("Aceitar", x => { var p = x.S.player; p.xp[(int)a] += 9; p.energy -= 10; p.coach += 2; return $"Treino puxado. Você vai evoluir em {l}."; }),
+                    Opt("Aceitar", x => { var p = x.S.player; x.AddSquad(3); p.xp[(int)a] += 9; p.energy -= 10; p.coach += 2; return $"Treino puxado. Você vai evoluir em {l}."; }),
                     Opt("Recusar e descansar", x => { x.S.player.energy += 5; return "Você foi para casa descansar."; })); }),
 
             (g => g.S.player.fame >= 8, .9, g => Ev("Provocação nas redes", "Um jogador do próximo adversário postou uma provocação marcando você.",
@@ -49,8 +49,8 @@ namespace Camisa10.Core
                 Opt("Ignorar", x => { x.S.player.coach += 1; return "Você vai responder dentro de campo."; }))),
 
             (g => true, 1, g => Ev("Churrasco do elenco", "O grupo marcou um churrasco no fim de semana.",
-                Opt("Ir", x => { var p = x.S.player; p.moral += 5; p.coach += 3; p.energy -= 5; return "Resenha boa. O elenco está mais unido."; }),
-                Opt("Não ir", x => { x.S.player.coach -= 2; return "Sentiram sua falta."; }))),
+                Opt("Ir", x => { var p = x.S.player; x.AddSquad(6); p.moral += 5; p.coach += 3; p.energy -= 5; return "Resenha boa. O elenco está mais unido."; }),
+                Opt("Não ir", x => { x.AddSquad(-3); x.S.player.coach -= 2; return "Sentiram sua falta."; }))),
 
             (g => g.S.player.fame >= 20 && !g.S.season.forceExit, .7, g => Ev("Seu empresário quer agir",
                 "Ele quer espalhar que você deseja jogar em um clube maior. Isso atrai propostas, mas irrita a diretoria.",
@@ -79,15 +79,15 @@ namespace Camisa10.Core
             (g => g.S.player.fame >= 28 && g.MyClub.league != "sa", .5, g => {
                 var club = Rng.Pick(new[] { "Al-Hilal", "Al-Nassr", "Al-Ittihad", "Al-Ahli" });
                 return Ev($"Ligação da Arábia Saudita", $"O {club} quer você e fala em salário quatro vezes maior. Eles pedem uma resposta discreta.",
-                    Opt("Ouvir a proposta", x => { x.S.interestLeague = "sa"; x.S.player.coach -= 6; x.S.player.moral += 3;
+                    Opt("Ouvir a proposta", x => { x.AddFans(-4); x.S.interestLeague = "sa"; x.S.player.coach -= 6; x.S.player.moral += 3;
                         return $"Você deixou a porta aberta. No fim da temporada o {club} vai fazer uma proposta oficial."; }),
-                    Opt("Não tenho interesse", x => { x.S.player.coach += 4; x.S.player.fame += 1; return "A diretoria e a torcida gostaram da sua lealdade."; })); }),
+                    Opt("Não tenho interesse", x => { x.AddFans(5); x.S.player.coach += 4; x.S.player.fame += 1; return "A diretoria e a torcida gostaram da sua lealdade."; })); }),
 
             (g => g.S.player.fame >= 40 && g.Ovr >= 74 && g.MyClub.league != "en" && g.MyClub.league != "ib", .55, g => {
                 var club = Rng.Pick(new[] { "Real Madrid", "Barcelona", "Manchester City", "Liverpool", "Arsenal", "Paris Saint-Germain", "Inter de Milão" });
                 var lg = Array.Find(GameData.Leagues, l => Array.Exists(l.Clubs, c => c.name == club))?.Id ?? "en";
                 return Ev("Olheiro na arquibancada", $"A imprensa descobriu: o {club} mandou observar você no último jogo.",
-                    Opt("Mandar um recado: \"é um sonho\"", x => { x.S.interestLeague = lg; x.S.player.coach -= 8; x.S.player.fame += 3;
+                    Opt("Mandar um recado: \"é um sonho\"", x => { x.AddFans(-6); x.S.interestLeague = lg; x.S.player.coach -= 8; x.S.player.fame += 3;
                         return $"Manchete no mundo todo. O {club} deve fazer proposta no fim da temporada; seu clube não gostou."; }),
                     Opt("Desconversar", x => { x.S.player.coach += 3; return "\"Estou focado aqui.\" A diretoria respirou aliviada."; })); }),
 
@@ -115,9 +115,9 @@ namespace Camisa10.Core
                 Opt("Falar com o médico do clube", x => { x.S.player.energy += 5; x.S.player.coach += 3; return "O médico indicou um remédio liberado. Profissionalismo."; }))),
 
             (g => g.S.season.week >= 4, .4, g => Ev("Salários atrasados", "O clube atrasou dois meses de salário. O elenco quer uma posição sua, que é uma das lideranças.",
-                Opt("Cobrar a diretoria publicamente", x => { var p = x.S.player; p.coach -= 10; p.fame += 3; p.money += x.S.contract.salary * 4;
+                Opt("Cobrar a diretoria publicamente", x => { var p = x.S.player; x.AddSquad(7); p.coach -= 10; p.fame += 3; p.money += x.S.contract.salary * 4;
                     return "Pegou mal com a diretoria, mas os salários caíram na conta em dois dias."; }),
-                Opt("Resolver no vestiário", x => { x.S.player.moral -= 4; x.S.player.coach += 4; return "Você segurou o grupo. O dinheiro vai demorar, mas o clima ficou bom."; }))),
+                Opt("Resolver no vestiário", x => { x.AddSquad(4); x.S.player.moral -= 4; x.S.player.coach += 4; return "Você segurou o grupo. O dinheiro vai demorar, mas o clima ficou bom."; }))),
 
             // ---------- vida pessoal ----------
             (g => g.S.player.fame >= 25, .5, g => {
@@ -127,13 +127,13 @@ namespace Camisa10.Core
                     Opt("Dizer que é só amizade", x => { x.S.player.fame += 2; return "A história esfriou em uma semana."; })); }),
 
             (g => true, .6, g => Ev("Briga no treino", "Um companheiro deu uma entrada dura em você no rachão e partiu para cima.",
-                Opt("Revidar", x => { var p = x.S.player; p.coach -= 8; p.moral -= 2;
+                Opt("Revidar", x => { var p = x.S.player; x.AddSquad(-6); p.coach -= 8; p.moral -= 2;
                     if (Rng.Chance(.4)) { p.injury = 1; return "Os dois foram afastados. Você está fora da próxima rodada."; }
                     return "A turma do deixa-disso separou. O técnico anotou o seu nome."; }),
-                Opt("Esfriar a cabeça", x => { x.S.player.coach += 4; return "Você deixou para lá e depois apertou a mão dele. O grupo te respeita."; }))),
+                Opt("Esfriar a cabeça", x => { x.AddSquad(4); x.S.player.coach += 4; return "Você deixou para lá e depois apertou a mão dele. O grupo te respeita."; }))),
 
             (g => true, .6, g => Ev("Comemoração viralizou", "A sua dancinha de comemoração do último gol virou trend nas redes, com milhões de visualizações.",
-                Opt("Gravar com a torcida", x => { var p = x.S.player; p.fame += 4; p.moral += 4; return "A torcida adorou. Você virou figurinha carimbada."; }),
+                Opt("Gravar com a torcida", x => { var p = x.S.player; x.AddFans(4); p.fame += 4; p.moral += 4; return "A torcida adorou. Você virou figurinha carimbada."; }),
                 Opt("Deixar quieto", x => { x.S.player.fame += 1; return "A trend passou, mas o nome ficou."; }))),
 
             (g => g.S.player.money >= 150000, .5, g => {
@@ -148,11 +148,11 @@ namespace Camisa10.Core
                 Opt("Cobrar a posição de titular", x => { var p = x.S.player; p.coach = Rng.Chance(.5) ? 65 : 35; return p.coach > 50 ? "Ele gostou da personalidade." : "Ele não gostou da cobrança logo no primeiro dia."; }))),
 
             (g => g.S.player.form.Count > 0 && g.FormAvg < 6.3f, 1, g => Ev("Protesto da organizada", "Depois de maus resultados, a torcida organizada foi ao CT cobrar o elenco. Eles chamam você.",
-                Opt("Ir conversar com eles", x => { var p = x.S.player; p.moral += 4; p.fame += 2; return "Conversa franca. A torcida prometeu apoio até o fim."; }),
-                Opt("Ficar no vestiário", x => { x.S.player.moral -= 5; return "Picharam o muro do CT com o seu nome. Clima pesado."; }))),
+                Opt("Ir conversar com eles", x => { var p = x.S.player; x.AddFans(7); p.moral += 4; p.fame += 2; return "Conversa franca. A torcida prometeu apoio até o fim."; }),
+                Opt("Ficar no vestiário", x => { x.AddFans(-6); x.S.player.moral -= 5; return "Picharam o muro do CT com o seu nome. Clima pesado."; }))),
 
             (g => g.S.player.form.Count > 0 && g.FormAvg >= 7.2f, .8, g => Ev("Elogio de lenda", "Um ídolo histórico do clube disse na TV que você \"é o melhor que vê em campo há anos\".",
-                Opt("Agradecer publicamente", x => { var p = x.S.player; p.fame += 3; p.moral += 6; return "A torcida adorou a troca de carinho entre gerações."; }),
+                Opt("Agradecer publicamente", x => { var p = x.S.player; x.AddFans(3); p.fame += 3; p.moral += 6; return "A torcida adorou a troca de carinho entre gerações."; }),
                 Opt("Pedir conselho a ele", x => { var p = x.S.player; p.xp[(int)Game.MainAttr(p.pos)] += 12; p.moral += 3; return "Vocês treinaram juntos uma tarde inteira. Você vai evoluir."; }))),
 
             // ---------- seleção ----------
@@ -280,16 +280,16 @@ namespace Camisa10.Core
                 Opt("Manter o empresário atual", x => { x.S.player.moral -= 3; return "Ele entendeu, mas ficou chateado."; }))),
 
             (g => true, .4, g => Ev("Adoção", "Um abrigo de animais pede ajuda e um vira-lata te seguiu na saída do treino.",
-                Opt("Adotar o cachorro", x => { var p = x.S.player; p.moral += 7; p.fame += 2; return "O Gol (é o nome dele) já virou xodó da torcida."; }),
+                Opt("Adotar o cachorro", x => { var p = x.S.player; x.AddFans(2); p.moral += 7; p.fame += 2; return "O Gol (é o nome dele) já virou xodó da torcida."; }),
                 Opt("Fazer uma doação", x => { var p = x.S.player; p.money -= 5000; p.fame += 2; return "Sua doação reformou o abrigo."; }))),
 
             (g => g.S.season.week >= 6 && g.S.player.form.Count > 0 && g.FormAvg >= 6.8f, .4, g => Ev("Tatuagem do escudo", "Você está pensando em tatuar o escudo do clube no braço.",
-                Opt("Tatuar", x => { var p = x.S.player; p.fame += 3; p.coach += 3; p.moral += 4; return "A torcida enlouqueceu. Você virou ídolo de vez."; }),
+                Opt("Tatuar", x => { var p = x.S.player; x.AddFans(9); p.fame += 3; p.coach += 3; p.moral += 4; return "A torcida enlouqueceu. Você virou ídolo de vez."; }),
                 Opt("Melhor não", x => "Você preferiu não se comprometer."))),
 
             // ---------- campo ----------
             (g => g.S.season.week >= 3, .5, g => Ev("Improvisado", "Com desfalques, o técnico pergunta se você topa jogar improvisado em outra posição no próximo jogo.",
-                Opt("Topar pelo time", x => { var p = x.S.player; p.coach += 8; p.xp[(int)x.WeakestAttr()] += 8; return "O técnico não esquece quem topa o sacrifício."; }),
+                Opt("Topar pelo time", x => { var p = x.S.player; x.AddSquad(4); p.coach += 8; p.xp[(int)x.WeakestAttr()] += 8; return "O técnico não esquece quem topa o sacrifício."; }),
                 Opt("Pedir para jogar na sua posição", x => { x.S.player.coach -= 4; return "Ele aceitou, mas não gostou muito."; }))),
 
             (g => g.S.season.week >= 2, .4, g => Ev("Dividida dura", "Numa dividida no último jogo, um adversário se machucou feio. A imprensa diz que você exagerou.",

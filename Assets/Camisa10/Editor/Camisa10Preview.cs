@@ -91,13 +91,17 @@ namespace Camisa10.EditorTools
             var app = go.AddComponent<GameApp>();
             var t = typeof(GameApp);
             t.GetMethod("BuildShell", flags).Invoke(app, null);
+            Rng.Seed(3);
             var game = Camisa10.Core.Game.NewCareer("Gabriel Souza", "ATA", new[] { 4, 4, 3, 3, 3, 3 });
+            PlayRounds(game, 9); // tabela, artilharia e caixa de mensagens com cara de meio de temporada
             game.S.owned.Add("carro1"); // mostra um item comprado na vitrine
             game.StartDating(); game.S.love.stage = 2; game.S.love.affection = 72; // vida pessoal preenchida
             game.S.rival.goals = 3; game.S.season.stats.goals = 4;
             typeof(Camisa10.Core.Game).GetMethod("PayWeek", flags).Invoke(game, new object[] { 1 }); // extrato de uma rodada com gol
             game.S.titles.AddRange(new[] { "Campeão do Brasileirão 2026", "Campeão da Copa do Brasil 2026", "Campeão da Copa do Mundo 2026", "Campeão da Premier League 2028" });
             game.S.awards.AddRange(new[] { "Bola de Ouro 2027", "Artilheiro do Brasileirão 2026 (21 gols)", "Craque do Brasileirão 2026" });
+            game.Mail("elenco", "Arrascaeta", "Churrasco no sábado", "Fala, Gabriel! Vai ter churrasco lá em casa depois do jogo. Cola?", "churrasco", null, "Tô dentro!", "Dessa vez não vai dar");
+            game.Mail("patrocinador", "Volt", "Campanha nas redes", "Lançamos uma campanha nova e queremos um post seu. Cachê de R$ 900.", "patrocinador_post", "900", "Postar", "Agora não");
             t.GetField("game", flags).SetValue(app, game);
 
             var cam = new GameObject("CamMenus").AddComponent<Camera>();
@@ -110,10 +114,19 @@ namespace Camisa10.EditorTools
             canvas.planeDistance = 1;
             var scaler = go.GetComponentInChildren<UnityEngine.UI.CanvasScaler>();
 
-            foreach (var tab in new[] { "home", "player", "life", "agenda", "settings", "trophies" })
+            var scroll = (UnityEngine.UI.ScrollRect)t.GetField("scroll", flags).GetValue(app);
+            foreach (var shot in new[] { "home", "home-baixo", "inbox", "player", "life", "life-baixo", "agenda", "settings", "trophies", "fim" })
             {
+                string tab = shot.Replace("-baixo", "");
+                if (shot == "fim") { PlayRounds(game, 99); tab = "home"; } // fim de temporada: balanço, objetivos e propostas
                 t.GetField("tab", flags).SetValue(app, tab);
                 t.GetMethod("Render", flags).Invoke(app, new object[] { true });
+                if (shot.EndsWith("-baixo"))
+                {
+                    Canvas.ForceUpdateCanvases();
+                    UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)canvas.transform);
+                    scroll.verticalNormalizedPosition = 0;
+                }
                 for (int i = 0; i < 3; i++)
                 {
                     typeof(UnityEngine.UI.CanvasScaler).GetMethod("Handle", flags).Invoke(scaler, null);
@@ -127,13 +140,30 @@ namespace Camisa10.EditorTools
                 tex.ReadPixels(new Rect(0, 0, W, H), 0, 0);
                 tex.Apply();
                 RenderTexture.active = prev;
-                File.WriteAllBytes(Path.Combine(dir, "menu-" + tab + ".png"), tex.EncodeToPNG());
+                File.WriteAllBytes(Path.Combine(dir, "menu-" + shot + ".png"), tex.EncodeToPNG());
                 Object.DestroyImmediate(tex);
             }
             cam.targetTexture = null;
             rt.Release();
             Object.DestroyImmediate(cam.gameObject);
             Object.DestroyImmediate(go);
+        }
+
+        /// <summary>Joga rodadas com resultados sorteados (treino, lances e eventos), para as fotos terem uma carreira de verdade.</summary>
+        static void PlayRounds(Camisa10.Core.Game g, int rounds)
+        {
+            for (int i = 0; i < rounds && g.S.season.phase != "end"; i++)
+            {
+                if (g.S.player.injury > 0) g.Physio(); else g.Train(Camisa10.Core.Game.MainAttr(g.S.player.pos), "normal", out _);
+                var m = new MatchEngine(g);
+                int guard = 0;
+                while (!m.Done && guard++ < 200)
+                {
+                    if (m.Step() != StepResult.AwaitChoice || m.Current == null) continue;
+                    m.ResolveLive(Rng.Chance(.35) ? LiveOutcome.Goal : Rng.Chance(.3) ? LiveOutcome.Assist : LiveOutcome.Saved);
+                }
+                g.FinishMatch(m);
+            }
         }
 
         /// <summary>Salva qualquer textura (mesmo sem cópia na CPU) em PNG.</summary>

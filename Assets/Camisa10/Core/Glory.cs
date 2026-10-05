@@ -60,6 +60,7 @@ namespace Camisa10.Core
             new AchievementDef { Id = "europa", Name = "Rumo à Europa", Desc = "Assine com um clube da Espanha ou da Inglaterra.", Money = 50000, Fame = 4 },
             new AchievementDef { Id = "milionario", Name = "Milionário", Desc = "Junte R$ 1 milhão.", Money = 0, Fame = 2 },
             new AchievementDef { Id = "top3_bola", Name = "Entre os melhores do mundo", Desc = "Fique no top 3 da Bola de Ouro.", Money = 150000, Fame = 5 },
+            new AchievementDef { Id = "capitao", Name = "Capitão", Desc = "Receba a braçadeira de capitão do seu clube.", Money = 20000, Fame = 3 },
             new AchievementDef { Id = "bola_ouro", Name = "Bola de Ouro", Desc = "Seja eleito o melhor jogador do mundo.", Money = 500000, Fame = 8 },
         };
 

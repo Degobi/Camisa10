@@ -13,7 +13,7 @@ namespace Camisa10.Core
         public GameState S;
         public long Counter; // contraproposta pendente na negociação (não é salva)
 
-        public Game(GameState state) { S = state; EnsureProfile(); SyncClubs(); EnsureBusiness(); EnsureGlory(); EnsureLife(); }
+        public Game(GameState state) { S = state; EnsureProfile(); SyncClubs(); EnsureBusiness(); EnsureGlory(); EnsureLife(); EnsureReputation(); EnsureInbox(); EnsureObjectives(); }
 
         /// <summary>Saves antigos não tinham identidade: gera uma e marca a versão atual do formato.</summary>
         void EnsureProfile()
@@ -106,6 +106,8 @@ namespace Camisa10.Core
             p.moral = (float)Clamp(p.moral, 0, 100);
             p.fame = (float)Clamp(p.fame, 0, 100);
             p.coach = (float)Clamp(p.coach, 0, 100);
+            p.squad = (float)Clamp(p.squad, 0, 100);
+            p.fans = (float)Clamp(p.fans, 0, 100);
         }
 
         public void AddNews(string text)
@@ -143,6 +145,9 @@ namespace Camisa10.Core
             g.StartSeason();
             g.EnsureLife();
             g.AddNews($"Você assinou seu primeiro contrato profissional com o {g.MyClub.name}. Salário de {Fmt.Money(s.contract.salary)} por semana.");
+            g.Mail("empresario", g.AgentName, "Começou!", $"Parabéns pelo primeiro contrato profissional, {g.FirstName}! Daqui para frente eu cuido das propostas e dos patrocínios; você cuida do campo. " +
+                "Tudo o que chegar de importante vai aparecer aqui na sua caixa de mensagens.");
+            g.InboxSeasonStart(true);
             return g;
         }
 
@@ -157,6 +162,7 @@ namespace Camisa10.Core
             S.season = se;
             InitScorers();
             GenSponsorOffers();
+            MakeObjectives(0, 1);
         }
 
         static List<Round> MakeFixtures(List<string> ids)
@@ -304,7 +310,7 @@ namespace Camisa10.Core
             if (p.injury > 0) return Role.Lesionado;
             if (S.season.rested) return Role.Poupado;
             var c = MyClub;
-            double sc = Ovr + (p.coach - 50) * .12 + (p.moral - 50) * .05 + (FormAvg - 6.5) * 2 + (p.energy < 35 ? -6 : 0);
+            double sc = Ovr + (p.coach - 50) * .12 + (p.moral - 50) * .05 + (p.squad - 50) * .04 + (FormAvg - 6.5) * 2 + (p.energy < 35 ? -6 : 0);
             if (sc >= c.str + 6) return Role.Estrela;
             if (sc >= c.str - 4) return Role.Titular;
             return Role.Reserva;
@@ -335,6 +341,8 @@ namespace Camisa10.Core
                 injured = true;
                 msg += $" Você se lesionou e fica fora por {p.injury} rodada(s).";
                 AddNews($"Lesão no treino: {p.injury} rodada(s) fora.");
+                Mail("medico", "Departamento médico · " + MyClub.name, "Lesão no treino",
+                    $"Você sentiu no treino de hoje e os exames apontaram lesão. Previsão de {p.injury} rodada(s) fora. Siga a fisioterapia.");
             }
             S.season.phase = "match";
             S.season.role = ComputeRole();
@@ -352,6 +360,8 @@ namespace Camisa10.Core
         {
             var p = S.player; var se = S.season; var st = se.stats; var L = League(se.league);
             var f = CurrentFixture();
+            S.mailsThisRound = 0;
+            bool wasInjured = p.injury > 0;
             ApplyResult(f.pair.home, f.pair.away, f.home ? m.Gf : m.Ga, f.home ? m.Ga : m.Gf);
             foreach (var pr in se.rounds[se.week].games) if (pr != f.pair) SimOther(pr.home, pr.away);
 
@@ -381,6 +391,8 @@ namespace Camisa10.Core
             PayWeek(m.Goals);
             GloryAfterRound(m);
             LifeWeek(m);
+            ReputationAfterMatch(m);
+            InboxWeek(m, wasInjured);
             Normalize();
 
             string line = $"{m.My.name} {m.Gf} x {m.Ga} {m.Opp.name}";
@@ -399,6 +411,7 @@ namespace Camisa10.Core
                 se.phase = "train";
                 if (se.week == SeasonRounds / 2)
                 {
+                    ObjectivesMidSeason();
                     GenSponsorOffers();
                     if (S.sponsorOffers.Count > 0) AddNews("Novas propostas de patrocínio chegaram.");
                 }
@@ -437,6 +450,7 @@ namespace Camisa10.Core
 
             if (rank == 1) sm.titles.Add($"Campeão {GameData.Of(L.Name)} {se.year}");
             GloryEndSeason(sm, avg);
+            ObjectivesEndSeason(sm);
             WorldCupAtSeasonEnd(sm);
 
             foreach (var d in S.activeSponsors.ToList())
@@ -517,7 +531,15 @@ namespace Camisa10.Core
             }
             int n = Math.Min(4, 1 + (p.fame > 30 ? 1 : 0) + (se.forceExit ? 1 : 0) + (AvgRating >= 7 ? 1 : 0));
             var list = cands.Take(n).Select(c => MakeOffer(c, false)).ToList();
-            if (p.coach >= 30 && o >= MyClub.str - 10) list.Insert(0, MakeOffer(MyClub, true));
+            // renovação: pesa a relação com o técnico e os objetivos da temporada
+            int met = se.objMet, total = se.objectives?.Count ?? 0;
+            bool keep = p.coach >= 30 && o >= MyClub.str - 10 && !(total >= 3 && met == 0 && p.coach < 70);
+            if (keep)
+            {
+                var ren = MakeOffer(MyClub, true);
+                if (total > 0 && met == total) { ren.salary = R100(ren.salary * 1.12); ren.bonus = GoalBonusFor(ren.salary); ren.signing = R1000(ren.signing * 1.3); }
+                list.Insert(0, ren);
+            }
             if (list.Count == 0)
             {
                 var fallback = S.clubs.Where(c => c.league == "br" && c.id != S.contract.club).OrderBy(c => c.str).First();
@@ -538,6 +560,7 @@ namespace Camisa10.Core
             S.seasonNet = 0;
             RivalNewSeason();
             AddNews($"Começa a temporada {S.year}. Objetivo: evoluir e brilhar no {MyClub.name}.");
+            InboxSeasonStart(false);
         }
 
         public string AcceptOffer(string id)
@@ -560,6 +583,7 @@ namespace Camisa10.Core
             }
             if (changed)
             {
+                ReputationNewClub();
                 S.player.coach = 50; S.player.moral += 5; S.player.fame += (float)(3 * League(c.league).FameMult);
                 AddNews($"Contratado! Você assinou com o {c.name} por {o.years} temporada(s). Luvas de {Fmt.Money(o.signing)} ({Fmt.Money(net)} líquidos).");
             }

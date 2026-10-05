@@ -16,7 +16,7 @@ static class Program
         Rng.Seed(seed);
         int errors = 0;
         var allRatings = new List<float>();
-        int wcPlayed = 0, wcWon = 0, events = 0, penalties = 0, foreign = 0, actions = 0;
+        int wcPlayed = 0, wcWon = 0, events = 0, penalties = 0, foreign = 0, actions = 0, mails = 0, replies = 0, captains = 0;
         var leaguesSeen = new Dictionary<string, int>();
 
         for (int k = 0; k < n; k++)
@@ -24,7 +24,7 @@ static class Program
             string pos = Positions[k % Positions.Length];
             var g = Game.NewCareer("Simulado " + (k + 1), pos, new[] { 4, 4, 3, 3, 3, 3 });
             int seasons = 0;
-            var moneyBySeason = new List<long>(); var netBySeason = new List<long>();
+            var moneyBySeason = new List<long>(); var netBySeason = new List<long>(); var objBySeason = new List<string>();
             try
             {
                 while (!g.S.retired && seasons < 22)
@@ -43,6 +43,9 @@ static class Program
                             // compra o bem mais barato que ainda não tem quando sobra bastante dinheiro
                             var item = GameData.Items.Where(x => !g.S.owned.Contains(x.Id)).OrderBy(x => x.Price).FirstOrDefault();
                             if (item != null && g.S.player.money > item.Price * 3) g.Buy(item.Id);
+                            // caixa de mensagens: responde o que pede resposta
+                            foreach (var msg in g.S.inbox.Where(x => x.NeedsReply).ToList())
+                                if (g.Reply(msg.id, Rng.RangeInt(0, msg.options.Count - 1)) != null) replies++;
                             if (Rng.Chance(.42))
                             {
                                 var ev = GameEvents.Roll(g);
@@ -65,6 +68,7 @@ static class Program
                     }
                     if (g.S.wc != null && g.S.wc.champion && g.S.wc.year == g.S.year) wcWon++;
                     seasons++;
+                    objBySeason.Add($"{g.S.season.objMet}/{g.S.season.objectives.Count}");
                     moneyBySeason.Add(g.S.player.money);
                     netBySeason.Add(g.S.seasonNet);
                     var lg = g.MyClub.league;
@@ -87,17 +91,21 @@ static class Program
                 Console.WriteLine($"ERRO na carreira {k + 1} ({pos}), temporada {seasons}: {e}");
             }
             var s = g.S;
+            mails += s.inbox.Count; if (s.achievements.Contains("capitao")) captains++;
             Console.WriteLine($"Carreira {k + 1} ({pos}): {seasons} temporadas, {g.CareerApps} jogos, {g.CareerGoals} gols, geral {g.Ovr}, idade {s.player.age}, " +
                 $"Seleção {s.caps} jogos/{s.intlGoals} gols, Copas {s.worldCups}, títulos {s.titles.Count}: {string.Join("; ", s.titles.Take(6))}");
             Console.WriteLine($"   Clubes: {string.Join(" → ", s.career.Select(r => r.club).Distinct())}");
             Console.WriteLine($"   Dinheiro no fim de cada temporada: {string.Join(" | ", moneyBySeason.Select(x => Fmt.Money(x)))}");
+            Console.WriteLine($"   Objetivos cumpridos: {string.Join(" ", objBySeason)}");
             Console.WriteLine($"   Saldo de cada temporada: {string.Join(" | ", netBySeason.Select(x => Fmt.Money(x)))}");
             Console.WriteLine($"   Bens: {string.Join(", ", s.owned)}. Vida: {g.LoveLine()}. Rival {s.rival.name}: {s.rival.careerGoals} gols na carreira, duelos {s.rival.won}/{s.rival.duels}.");
+            Console.WriteLine($"   Reputação: técnico {s.player.coach:0}, elenco {s.player.squad:0}, torcida {s.player.fans:0}{(s.captain ? ", capitão" : "")}. Mensagens na caixa: {s.inbox.Count}.");
         }
         Console.WriteLine();
         Console.WriteLine($"Notas: média {allRatings.DefaultIfEmpty(0).Average():0.00}, mín {allRatings.DefaultIfEmpty(0).Min():0.0}, máx {allRatings.DefaultIfEmpty(0).Max():0.0} ({allRatings.Count} jogos)");
         Console.WriteLine($"Distribuição: <6: {allRatings.Count(r => r < 6) * 100 / Math.Max(1, allRatings.Count)}%  6-7: {allRatings.Count(r => r >= 6 && r < 7) * 100 / Math.Max(1, allRatings.Count)}%  7-8: {allRatings.Count(r => r >= 7 && r < 8) * 100 / Math.Max(1, allRatings.Count)}%  8+: {allRatings.Count(r => r >= 8) * 100 / Math.Max(1, allRatings.Count)}%");
         Console.WriteLine($"Copas do Mundo disputadas: {wcPlayed}, vencidas: {wcWon}. Eventos: {events}. Ações da agenda: {actions}. Pênaltis no jogo: {penalties}.");
+        Console.WriteLine($"Respostas a mensagens: {replies}. Carreiras que chegaram a capitão: {captains} de {n}.");
         Console.WriteLine($"Temporadas por liga: {string.Join(", ", leaguesSeen.Select(x => x.Key + "=" + x.Value))}. Fora do Brasil: {foreign}.");
         Console.WriteLine(errors == 0 ? "OK: nenhuma exceção." : $"{errors} carreira(s) com erro.");
         return errors == 0 ? 0 : 1;

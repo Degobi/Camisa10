@@ -245,6 +245,7 @@ namespace Camisa10.UI
             match = null;
             Destroy(matchRoot);
             Commit(null, true);
+            if (game.S.mailsThisRound > 0) Toast(game.S.mailsThisRound == 1 ? "Você tem uma mensagem nova." : $"Você tem {game.S.mailsThisRound} mensagens novas.");
             if (wcLine != null) ShowModal(game.S.wc.champion ? "CAMPEÃO DO MUNDO!" : "Copa do Mundo", wcLine, ("Continuar", (Action)CloseModal, true));
         }
     }

@@ -31,7 +31,9 @@ namespace Camisa10.Core
             new ActionDef { Id = "imprensa", Icon = "IMP", Name = "Coletiva de imprensa", Energy = -3, Hint = "Ganha fama. Uma resposta atravessada pode virar polêmica." },
             new ActionDef { Id = "redes", Icon = "WEB", Name = "Post nas redes", Energy = 0, Hint = "Ganha seguidores. Com patrocinador, rende um extra." },
             new ActionDef { Id = "evento", Icon = "PAT", Name = "Evento do patrocinador", Energy = -6, Hint = "Cachê e fama. Precisa de um patrocínio ativo.", Available = g => g.S.activeSponsors.Count > 0 },
-            new ActionDef { Id = "social", Icon = "SOC", Name = "Ação social", Energy = -4, Hint = "Aumenta moral e fama." },
+            new ActionDef { Id = "social", Icon = "SOC", Name = "Ação social", Energy = -4, Hint = "Aumenta moral e fama. A torcida repara." },
+            new ActionDef { Id = "resenha", Icon = "ELE", Name = "Resenha com o elenco", Energy = -4, Hint = "Videogame, churrasco, pagode. Une o vestiário com você." },
+            new ActionDef { Id = "torcida", Icon = "TOR", Name = "Atender torcedores", Energy = -3, Hint = "Autógrafos e fotos na saída do CT. A torcida adora." },
             new ActionDef { Id = "balada", Icon = "NOI", Name = "Noite com os amigos", Energy = -12, Hint = "Moral lá em cima, mas o técnico pode descobrir." },
             new ActionDef { Id = "empresario", Icon = "EMP", Name = "Reunião com o empresário", Energy = 0, Hint = "Divulga seu nome no mercado. Atrai propostas, irrita a diretoria.", Available = g => g.S.player.fame >= 15 && !g.S.season.forceExit },
             // vida pessoal
@@ -197,17 +199,25 @@ namespace Camisa10.Core
                     msg = $"Evento da {d.brand}: cachê de {Fmt.Money(fee)}.";
                     break;
                 }
+                case "resenha":
+                    AddSquad(5); p.moral += 3;
+                    msg = Rng.Chance(.5) ? $"Resenha boa com {Teammate()} e a turma. O vestiário está com você." : "Noite de videogame com o elenco. Você ganhou a final (e o respeito).";
+                    break;
+                case "torcida":
+                    AddFans(4); p.fame += .4f;
+                    msg = "Meia hora de autógrafos e selfies na saída do CT. Um garoto chorou ao te abraçar.";
+                    break;
                 case "social":
-                    p.moral += 4; p.fame += 1.2f;
+                    AddFans(2); p.moral += 4; p.fame += 1.2f;
                     msg = "A ação social emocionou a torcida.";
                     break;
                 case "balada":
-                    p.moral += 8;
+                    p.moral += 8; AddSquad(1.5f);
                     if (Rng.Chance(.3)) { p.coach -= 6; msg = "Alguém postou foto sua de madrugada. O técnico ficou sabendo."; AddNews("Fotos de madrugada repercutiram mal no clube."); }
                     else msg = "Noite boa e discreta.";
                     break;
                 case "empresario":
-                    p.coach -= 6; se.forceExit = true;
+                    p.coach -= 6; se.forceExit = true; AddFans(-3);
                     msg = "Seu nome está circulando. Mais clubes vão te observar no fim da temporada.";
                     break;
                 case "encontro":
@@ -250,7 +260,7 @@ namespace Camisa10.Core
                 case "rival":
                 {
                     var r = S.rival;
-                    r.heat = (float)Clamp(r.heat + 12, 0, 100); p.fame += 1.2f; p.moral += 2;
+                    r.heat = (float)Clamp(r.heat + 12, 0, 100); p.fame += 1.2f; p.moral += 2; AddFans(2);
                     if (Rng.Chance(.25 + r.heat / 400.0)) { p.coach -= 3; msg = $"Sua provocação para {r.name} pegou mal no clube. Pediram calma."; }
                     else msg = $"A torcida foi à loucura com a alfinetada em {r.name}.";
                     break;
