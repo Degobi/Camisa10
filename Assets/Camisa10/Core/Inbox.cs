@@ -165,6 +165,12 @@ namespace Camisa10.Core
                 }
                 p.coach += 2; r.heat -= 4; return "\"Falo dentro de campo.\" A imprensa elogiou a postura.";
             },
+            ["janela"] = (g, m, o) => g.WindowReply(m, o),
+            ["rumor"] = (g, m, o) =>
+            {
+                if (o == 0) { g.AddFans(4); g.S.player.coach += 2; g.S.season.rumor = null; return "A torcida aplaudiu. O assunto esfriou."; }
+                g.AddFans(-4); g.S.player.fame += 1.5f; g.S.player.coach -= 3; return "A frase rodou o mundo. O clube interessado vai se mexer na janela.";
+            },
             ["capitao"] = (g, m, o) =>
             {
                 var p = g.S.player;

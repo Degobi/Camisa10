@@ -16,8 +16,21 @@ static class Program
         Rng.Seed(seed);
         int errors = 0;
         var allRatings = new List<float>();
-        int wcPlayed = 0, wcWon = 0, events = 0, penalties = 0, foreign = 0, actions = 0, mails = 0, replies = 0, captains = 0, press = 0, motm = 0;
+        int wcPlayed = 0, wcWon = 0, events = 0, penalties = 0, foreign = 0, actions = 0, mails = 0, replies = 0, captains = 0, press = 0, motm = 0, midMoves = 0, loans = 0, requests = 0;
         var leaguesSeen = new Dictionary<string, int>();
+
+        // teste direto: troca de liga no meio da temporada e empréstimo (tabela remontada, volta do empréstimo)
+        foreach (bool loan in new[] { false, true })
+        {
+            var t = Game.NewCareer("Teste janela", "ATA", new[] { 4, 4, 3, 3, 3, 3 });
+            while (t.S.season.week < 18) { t.Train(Attr.Fin, "normal", out _); var mm = new MatchEngine(t); Play(mm, ref penalties); t.FinishMatch(mm); }
+            var dest = t.S.clubs.First(c => c.league == (loan ? "br" : "ib") && c.id != t.S.contract.club);
+            string home0 = t.S.contract.club;
+            t.S.windowOffers.Add(new ContractOffer { id = "teste", club = dest.id, salary = 9000, years = 3, clause = 1000000, clauseMet = true, loan = loan });
+            Console.WriteLine($"Teste {(loan ? "empréstimo" : "troca de liga")}: {t.AcceptWindowOffer("teste")} Liga agora: {t.S.season.league}, rodada {t.S.season.week + 1}, tabela com {t.S.season.table.Sum(r => r.p)} jogos.");
+            while (t.S.season.phase != "end") { if (t.S.season.phase == "train") t.Train(Attr.Fin, "normal", out _); var mm = new MatchEngine(t); Play(mm, ref penalties); t.FinishMatch(mm); }
+            Console.WriteLine($"   Fim: {t.S.career.Last().club}, {t.S.career.Last().apps} jogos. Contrato com {t.MyClub.name}{(loan && t.S.contract.club == home0 ? " (voltou do empréstimo)" : "")}.");
+        }
 
         for (int k = 0; k < n; k++)
         {
@@ -43,9 +56,13 @@ static class Program
                             // compra o bem mais barato que ainda não tem quando sobra bastante dinheiro
                             var item = GameData.Items.Where(x => !g.S.owned.Contains(x.Id)).OrderBy(x => x.Price).FirstOrDefault();
                             if (item != null && g.S.player.money > item.Price * 3) g.Buy(item.Id);
-                            // caixa de mensagens: responde o que pede resposta
+                            // pedido para sair de vez em quando
+                            if (g.S.season.week == 3 && g.CanRequestTransfer && Rng.Chance(.06)) { g.RequestTransfer(); requests++; }
+                            // caixa de mensagens: responde o que pede resposta (propostas da janela incluídas)
+                            string clubBefore = g.S.contract.club;
                             foreach (var msg in g.S.inbox.Where(x => x.NeedsReply).ToList())
                                 if (g.Reply(msg.id, Rng.RangeInt(0, msg.options.Count - 1)) != null) replies++;
+                            if (g.S.contract.club != clubBefore) { if (g.OnLoan) loans++; else midMoves++; }
                             if (Rng.Chance(.42))
                             {
                                 var ev = GameEvents.Roll(g);
@@ -111,6 +128,7 @@ static class Program
         Console.WriteLine($"Distribuição: <6: {allRatings.Count(r => r < 6) * 100 / Math.Max(1, allRatings.Count)}%  6-7: {allRatings.Count(r => r >= 6 && r < 7) * 100 / Math.Max(1, allRatings.Count)}%  7-8: {allRatings.Count(r => r >= 7 && r < 8) * 100 / Math.Max(1, allRatings.Count)}%  8+: {allRatings.Count(r => r >= 8) * 100 / Math.Max(1, allRatings.Count)}%");
         Console.WriteLine($"Copas do Mundo disputadas: {wcPlayed}, vencidas: {wcWon}. Eventos: {events}. Ações da agenda: {actions}. Pênaltis no jogo: {penalties}.");
         Console.WriteLine($"Craque do jogo: {motm} vezes ({motm * 100 / Math.Max(1, allRatings.Count)}% dos jogos). Perguntas de coletiva respondidas: {press}.");
+        Console.WriteLine($"Mercado no meio da temporada: {midMoves} transferência(s), {loans} empréstimo(s), {requests} pedido(s) para sair.");
         Console.WriteLine($"Respostas a mensagens: {replies}. Carreiras que chegaram a capitão: {captains} de {n}.");
         Console.WriteLine($"Temporadas por liga: {string.Join(", ", leaguesSeen.Select(x => x.Key + "=" + x.Value))}. Fora do Brasil: {foreign}.");
         Console.WriteLine(errors == 0 ? "OK: nenhuma exceção." : $"{errors} carreira(s) com erro.");

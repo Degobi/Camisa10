@@ -813,6 +813,12 @@ namespace Camisa10.UI
             UIKit.KV(cur, "Multa rescisória", Fmt.Money(k.clause));
             UIKit.KV(cur, "Duração", k.years > 0 ? $"mais {k.years} temporada(s)" : "terminou");
             UIKit.KV(cur, "Valor de mercado", Fmt.Money(game.MarketValue()));
+            if (game.OnLoan) UIKit.KV(cur, "Emprestado pelo", game.LoanParent?.name ?? "-");
+            if (se.transferRequest) UIKit.Tag(UIKit.Row(cur), "Na lista de transferências", Theme.Red, Color.white);
+            if (game.CanRequestTransfer)
+                UIKit.Ghost(cur, "Pedir para ser negociado", () => ShowModal("Pedir para ser negociado?",
+                    $"A diretoria vai ouvir propostas na janela do meio da temporada (depois da rodada {game.WindowRound}) e no fim do ano. O técnico, o elenco e a torcida não vão gostar.",
+                    ("Pedir para sair", (Action)(() => { CloseModal(); Commit(game.RequestTransfer()); }), true), ("Cancelar", (Action)CloseModal, false)));
 
             if (se.phase == "end")
             {
@@ -825,10 +831,25 @@ namespace Camisa10.UI
                     for (int j = i; j < i + 2; j++)
                     {
                         if (j >= offers.Count) { UIKit.LE(UIKit.Rect("Gap", pair), flexW: 1, prefW: 0, minW: 0); continue; }
-                        OfferCard(pair, offers[j]);
+                        OfferCard(pair, offers[j], false);
                     }
                 }
                 UIKit.Muted(oc, "Pedir mais pode melhorar salário e luvas, mas o clube pode desistir.", 22);
+            }
+            else if (game.WindowOpen)
+            {
+                var wc = UIKit.Tile(cols, "Janela de transferências", Theme.Gold, 1.6f);
+                UIKit.Muted(wc, $"A janela fecha depois da rodada {game.WindowRound + 2}. Trocar de clube agora: você segue o campeonato no clube novo (outra liga: tabela nova, e a copa fica para o ano que vem).", 22);
+                var offers = game.S.windowOffers.ToList();
+                for (int i = 0; i < offers.Count; i += 2)
+                {
+                    var pair = UIKit.Cols(wc, 16);
+                    for (int j = i; j < i + 2; j++)
+                    {
+                        if (j >= offers.Count) { UIKit.LE(UIKit.Rect("Gap", pair), flexW: 1, prefW: 0, minW: 0); continue; }
+                        OfferCard(pair, offers[j], true);
+                    }
+                }
             }
             else if (!se.negotiated)
             {
@@ -866,7 +887,7 @@ namespace Camisa10.UI
             }
         }
 
-        void OfferCard(Transform parent, ContractOffer o)
+        void OfferCard(Transform parent, ContractOffer o, bool window)
         {
             var club = game.ClubById(o.club);
             var sc = SubCard(parent);
@@ -875,18 +896,30 @@ namespace Camisa10.UI
             UIKit.Crest(r, club, 40, 48);
             var name = UIKit.Txt(r, club.name, 30, Theme.Ink, FontStyle.Bold, TextAnchor.MiddleLeft);
             UIKit.LE(name, flexW: 1, minW: 0);
-            UIKit.Tag(r, o.renewal ? "Renovação" : Game.League(club.league).Name, Theme.Card, Theme.Ink);
-            UIKit.KV(sc, "Salário", Fmt.Money(o.salary) + " por semana");
-            UIKit.KV(sc, "Duração", $"{o.years} temporada(s)");
-            UIKit.KV(sc, "Luvas", Fmt.Money(o.signing));
-            UIKit.KV(sc, "Bônus por gol", Fmt.Money(o.bonus));
+            UIKit.Tag(r, o.loan ? "Empréstimo" : o.clauseMet ? "Multa paga" : o.renewal ? "Renovação" : Game.League(club.league).Name, o.clauseMet ? Theme.Gold : Theme.Card, o.clauseMet ? Theme.GoldInk : Theme.Ink);
+            if (o.loan)
+            {
+                UIKit.KV(sc, "Duração", "até o fim da temporada");
+                UIKit.KV(sc, "Salário", "o mesmo, pago por eles");
+            }
+            else
+            {
+                UIKit.KV(sc, "Salário", Fmt.Money(o.salary) + " por semana");
+                UIKit.KV(sc, "Duração", $"{o.years} temporada(s)");
+                UIKit.KV(sc, "Luvas", Fmt.Money(o.signing));
+                UIKit.KV(sc, "Bônus por gol", Fmt.Money(o.bonus));
+            }
             UIKit.KV(sc, "Força do elenco", club.str.ToString());
             var br = UIKit.Row(sc, 12);
             string id = o.id;
-            UIKit.LE(UIKit.Primary(br, "Assinar", () => Commit(game.AcceptOffer(id))), flexW: 1, prefW: 0);
-            var hg = UIKit.Btn(br, o.haggled ? "Já negociado" : "Pedir mais", Theme.Card, Theme.Ink, () => Commit(game.Haggle(id)));
-            UIKit.LE(hg, flexW: 1, prefW: 0);
-            hg.interactable = !o.haggled;
+            UIKit.LE(UIKit.Primary(br, o.loan ? "Aceitar" : "Assinar", () => Commit(window ? game.AcceptWindowOffer(id) : game.AcceptOffer(id), true)), flexW: 1, prefW: 0);
+            if (!o.loan)
+            {
+                var hg = UIKit.Btn(br, o.haggled ? "Já negociado" : "Pedir mais", Theme.Card, Theme.Ink, () => Commit(window ? game.HaggleWindow(id) : game.Haggle(id)));
+                UIKit.LE(hg, flexW: 1, prefW: 0);
+                hg.interactable = !o.haggled;
+            }
+            if (window) UIKit.LE(UIKit.Btn(br, "Recusar", Theme.Card, Theme.Muted, () => { game.DeclineWindowOffer(id); Commit(); }), flexW: 1, prefW: 0);
         }
 
         // ---------- patrocínio ----------

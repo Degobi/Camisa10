@@ -220,6 +220,14 @@ namespace Camisa10.Core
             if (string.IsNullOrEmpty(r.name)) { NewRival(); return; }
             r.goals = 0;
             r.age++;
+            RelocateRival();
+        }
+
+        /// <summary>O rival vai para um clube forte da sua liga quando você muda de liga (ou de clube para o dele).</summary>
+        void RelocateRival()
+        {
+            var r = S.rival;
+            if (string.IsNullOrEmpty(r.name)) return;
             if (RivalClub == null || RivalClub.league != MyClub.league || r.club == S.contract.club)
             {
                 var others = S.clubs.Where(c => c.league == MyClub.league && c.id != S.contract.club).OrderByDescending(c => c.str).Take(5).ToList();

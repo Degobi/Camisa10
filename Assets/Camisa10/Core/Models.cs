@@ -65,6 +65,8 @@ namespace Camisa10.Core
         public int cupGoals, monthMark;                         // gols na copa; início da janela do prêmio do mês
         public List<Objective> objectives = new List<Objective>(); // objetivos do técnico e da diretoria
         public int objMet = -1;                                  // objetivos cumpridos (fim de temporada; -1 = ainda não avaliado)
+        public bool transferRequest;                             // pediu para ser negociado
+        public string rumor, startClub;                          // clube do rumor na imprensa; clube no começo da temporada
     }
 
     [Serializable]
@@ -83,6 +85,7 @@ namespace Camisa10.Core
         public long salary, bonus, signing, clause;
         public int years;
         public bool renewal, haggled;
+        public bool loan, clauseMet; // empréstimo até o fim da temporada; clube pagou a multa rescisória
     }
 
     // ---------- negócios no futebol ----------
@@ -173,6 +176,9 @@ namespace Camisa10.Core
         // especialidades e contadores que liberam algumas delas
         public List<string> traits = new List<string>();
         public int fkGoals, penGoals;
+        // mercado durante a temporada
+        public List<ContractOffer> windowOffers = new List<ContractOffer>();
+        public string loanFrom; // clube dono do contrato quando você está emprestado
         [NonSerialized] public int mailsThisRound;
     }
 }

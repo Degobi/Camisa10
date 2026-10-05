@@ -13,7 +13,7 @@ namespace Camisa10.Core
         public GameState S;
         public long Counter; // contraproposta pendente na negociação (não é salva)
 
-        public Game(GameState state) { S = state; EnsureProfile(); SyncClubs(); EnsureBusiness(); EnsureGlory(); EnsureLife(); EnsureTraits(); EnsureReputation(); EnsureInbox(); EnsureObjectives(); }
+        public Game(GameState state) { S = state; EnsureProfile(); SyncClubs(); EnsureBusiness(); EnsureGlory(); EnsureLife(); EnsureTraits(); EnsureReputation(); EnsureInbox(); EnsureMarket(); EnsureObjectives(); }
 
         /// <summary>Saves antigos não tinham identidade: gera uma e marca a versão atual do formato.</summary>
         void EnsureProfile()
@@ -157,7 +157,7 @@ namespace Camisa10.Core
             string lg = MyClub.league;
             var ids = S.clubs.Where(c => c.league == lg).Select(c => c.id).ToList();
             Rng.Shuffle(ids);
-            var se = new Season { year = S.year, league = lg, rounds = MakeFixtures(ids), topScorer = Rng.RangeInt(13, 22) };
+            var se = new Season { year = S.year, league = lg, rounds = MakeFixtures(ids), topScorer = Rng.RangeInt(13, 22), startClub = MyClub.name };
             foreach (var id in ids) se.table.Add(new TableRow { club = id });
             S.season = se;
             InitScorers();
@@ -396,6 +396,7 @@ namespace Camisa10.Core
             S.fkGoals += m.FreeKickGoals; S.penGoals += m.PenaltyGoals;
             CheckTraits();
             InboxWeek(m, wasInjured);
+            MarketWeek();
             Normalize();
 
             string line = $"{m.My.name} {m.Gf} x {m.Ga} {m.Opp.name}";
@@ -465,7 +466,8 @@ namespace Camisa10.Core
             }
 
             var c = MyClub;
-            S.career.Add(new CareerRecord { year = se.year, club = c.name, c1 = c.c1, c2 = c.c2, rank = rank, apps = st.apps, goals = st.goals,
+            string clubName = !string.IsNullOrEmpty(se.startClub) && se.startClub != c.name ? $"{se.startClub} / {c.name}" : c.name;
+            S.career.Add(new CareerRecord { year = se.year, club = clubName, c1 = c.c1, c2 = c.c2, rank = rank, apps = st.apps, goals = st.goals,
                 assists = st.assists, avg = st.apps > 0 ? (float)Math.Round(avg, 1) : 0 });
             // a temporada em números: dinheiro e a disputa com o rival
             sm.notes.Add(S.seasonNet >= 0 ? $"Você guardou {Fmt.Money(S.seasonNet)} na temporada, já descontados impostos e despesas."
@@ -473,6 +475,8 @@ namespace Camisa10.Core
             if (!string.IsNullOrEmpty(S.rival.name))
                 sm.notes.Add($"Rivalidade: você fez {st.goals} gol(s); {S.rival.name} fez {S.rival.goals}." +
                     (S.rival.duels > 0 ? $" Nos duelos diretos, você venceu {S.rival.won} de {S.rival.duels}." : ""));
+            EndLoan(sm);
+            S.windowOffers.Clear();
             S.titles.AddRange(sm.titles);
             S.awards.AddRange(sm.awards);
             CheckAchievements(null);
@@ -537,7 +541,7 @@ namespace Camisa10.Core
             var list = cands.Take(n).Select(c => MakeOffer(c, false)).ToList();
             // renovação: pesa a relação com o técnico e os objetivos da temporada
             int met = se.objMet, total = se.objectives?.Count ?? 0;
-            bool keep = p.coach >= 30 && o >= MyClub.str - 10 && !(total >= 3 && met == 0 && p.coach < 70);
+            bool keep = p.coach >= 30 && o >= MyClub.str - 10 && !(total >= 3 && met == 0 && p.coach < 70) && !se.transferRequest;
             if (keep)
             {
                 var ren = MakeOffer(MyClub, true);

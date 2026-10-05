@@ -116,18 +116,22 @@ namespace Camisa10.EditorTools
             var scaler = go.GetComponentInChildren<UnityEngine.UI.CanvasScaler>();
 
             var scroll = (UnityEngine.UI.ScrollRect)t.GetField("scroll", flags).GetValue(app);
-            foreach (var shot in new[] { "home", "home-baixo", "inbox", "player", "life", "life-baixo", "agenda", "settings", "trophies", "posjogo", "coletiva", "fim" })
+            foreach (var shot in new[] { "home", "home-baixo", "inbox", "player", "life", "life-baixo", "agenda", "settings", "trophies", "posjogo", "coletiva", "contrato-janela", "fim" })
             {
                 string tab = shot.Replace("-baixo", "");
                 if (shot == "posjogo" || shot == "coletiva" || shot == "fim") tab = "home";
-                if (shot == "fim")
+                if (shot == "contrato-janela")
                 {
-                    // fecha o pós-jogo e joga até o fim da temporada: balanço, objetivos e propostas
-                    t.GetMethod("CloseModal", flags).Invoke(app, null);
+                    // fecha o pós-jogo, pede para sair e joga até a janela do meio da temporada abrir
+                    tab = "contract";
+                    var md = (GameObject)t.GetField("modal", flags).GetValue(app);
+                    if (md != null) Object.DestroyImmediate(md);
                     var pr = (GameObject)t.GetField("postRoot", flags).GetValue(app);
                     if (pr != null) Object.DestroyImmediate(pr);
-                    PlayRounds(game, 99);
+                    game.RequestTransfer();
+                    PlayRounds(game, game.WindowRound - game.S.season.week);
                 }
+                if (shot == "fim") PlayRounds(game, 99); // fim de temporada: balanço, objetivos e propostas
                 t.GetField("tab", flags).SetValue(app, tab);
                 if (shot != "coletiva") t.GetMethod("Render", flags).Invoke(app, new object[] { true });
                 if (shot == "posjogo")
